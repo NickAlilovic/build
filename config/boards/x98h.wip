@@ -1,0 +1,17 @@
+# Allwinner H618 quad core 2GB RAM SoC WiFi USB
+BOARD_NAME="x98h"
+BOARDFAMILY="sun50iw9"
+BOARD_MAINTAINER="Nick A"
+BOOTCONFIG="x98_defconfig"
+OVERLAY_PREFIX="sun50i-h616"
+BOOT_LOGO="desktop"
+KERNEL_TARGET="current,edge"
+FORCE_BOOTSCRIPT_UPDATE="yes"
+
+function post_family_tweaks__station_m2() {
+    display_alert "$BOARD" "Installing board tweaks" "info"
+
+	cp -R $SRC/packages/blobs/station/firmware/brcm/* $SDCARD/lib/firmware/brcm
+
+	return 0
+}
