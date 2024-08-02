@@ -20,7 +20,7 @@ index 4760ea378bdd..2529e9643c46 100644
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h618-orangepi-zero3.dtb
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h618-orangepi-zero2w.dtb
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h618-transpeed-8k618-t.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h618-X98H.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h618-x98h.dtb
  
  subdir-y	:= $(dts-dirs) overlay
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h618-x98h.dts b/arch/arm64/boot/dts/allwinner/sun50i-h618-x98h.dts
