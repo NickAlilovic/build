@@ -11,11 +11,11 @@ Signed-off-by: Nick Alilovic <nickalilovic@gmail.com>
  1 file changed, 31 insertions(+)
  create mode 100644 configs/x98h_deconfig
 
-diff --git a/configs/x98h_deconfig b/configs/x98h_deconfig
+diff --git a/configs/x98h_deconfig b/configs/x98h_defconfig
 new file mode 100644
 index 0000000000..1cdcdc4dfc
 --- /dev/null
-+++ b/configs/x98h_deconfig
++++ b/configs/x98h_defconfig
 @@ -0,0 +1,31 @@
 +CONFIG_ARM=y
 +CONFIG_ARCH_SUNXI=y
