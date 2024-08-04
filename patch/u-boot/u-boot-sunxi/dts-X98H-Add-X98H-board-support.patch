@@ -8,8 +8,8 @@ Add X98H board support
 Signed-off-by: Nick Alilovic <nickalilovic@gmail.com>
 ---
  arch/arm/dts/Makefile             |   3 +-
- arch/arm/dts/sun50i-h618-x98h.dts | 209 ++++++++++++++++++++++++++++++
- 2 files changed, 213 insertions(+), 1 deletion(-)
+ arch/arm/dts/sun50i-h618-x98h.dts | 208 ++++++++++++++++++++++++++++++
+ 2 files changed, 211 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm/dts/sun50i-h618-x98h.dts
 
 diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
@@ -31,7 +31,7 @@ new file mode 100644
 index 0000000000..36bb1fd438
 --- /dev/null
 +++ b/arch/arm/dts/sun50i-h618-x98h.dts
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,208 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * Author: nickalilovic@gmail.com
@@ -129,7 +129,6 @@ index 0000000000..36bb1fd438
 +	status = "okay";
 +};
 +
-+/* WiFi & BT combo module is connected to this Host */
 +&ehci3 {
 +	status = "okay";
 +};
@@ -239,7 +238,6 @@ index 0000000000..36bb1fd438
 +
 +&usbphy {
 +	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_vcc5v>;
 +	status = "okay";
 +};
 -- 
