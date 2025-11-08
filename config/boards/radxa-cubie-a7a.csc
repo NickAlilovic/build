@@ -25,3 +25,5 @@ OFFSET=16
 BOOTSTART="1"
 BOOTSIZE="512"
 ROOTSTART="513"
+enable_extension "radxa-aic8800"
+AIC8800_TYPE="usb"
