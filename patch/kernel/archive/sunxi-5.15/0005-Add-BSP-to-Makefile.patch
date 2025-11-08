@@ -1,0 +1,27 @@
+From 343dbdf61dccee749f3b39911ef5cf2c1030a0f4 Mon Sep 17 00:00:00 2001
+From: Nick Alilovic <nickalilovic@gmail.com>
+Date: Tue, 4 Nov 2025 14:16:09 -0500
+Subject: [PATCH] Add BSP to Makefile
+
+---
+ Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/Makefile b/Makefile
+index c01c777a88..1c9b376fb1 100644
+--- a/Makefile
++++ b/Makefile
+@@ -5,6 +5,10 @@ SUBLEVEL = 147
+ EXTRAVERSION =
+ NAME = Trick or Treat
+ 
++export BSP_TOP := bsp/
++export LICHEE_KERN_DIR := ./
++export KBUILD_DEFCONFIG := bsp.config
++
+ # *DOCUMENTATION*
+ # To see a list of typical targets execute "make help"
+ # More info can be located in ./README
+-- 
+2.34.1
+
