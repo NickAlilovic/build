@@ -8,7 +8,7 @@ BOOT_LOGO="desktop"
 KERNEL_TARGET="legacy"
 SRC_EXTLINUX="yes"
 UBOOT_EXTLINUX_ROOT="root=UUID=%%ROOT_PARTUUID%%"
-SRC_CMDLINE="earlycon=sunxi-uart,0x02500000,115200 console=ttyAS0,115200n8 console=tty0 video=HDMI-A-1:1920x1080@60e fbcon=map:0 rootwait coherent_pool=2M irqchip.gicv3_pseudo_nmi=0 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory swapaccount=1 kasan=off"
+SRC_CMDLINE="earlycon=sunxi-uart,0x02500000,115200 console=ttyAS0,115200n8 console=tty1 video=HDMI-A-1:1920x1080@60e fbcon=map:0 rootwait coherent_pool=2M irqchip.gicv3_pseudo_nmi=0 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory swapaccount=1 kasan=off"
 BOOTSCRIPT="extlinux.conf"
 # Force explicit DTB path in extlinux.conf (not fdtdir auto-detect)
 BOOT_FDT_FILE="allwinner/sun60i-a733-cubie-a7a.dtb"
