@@ -2,7 +2,6 @@
 BOARD_NAME="radxa cubie a7a"
 BOARDFAMILY="sun60iw2"
 BOARD_MAINTAINER=""
-BOOTCONFIG="radxa-cubie-a7a_defconfig"
 OVERLAY_PREFIX="dtbo"
 BOOT_LOGO="desktop"
 KERNEL_TARGET="legacy"
@@ -28,7 +27,11 @@ enable_extension "radxa-aic8800"
 AIC8800_TYPE="usb"
 
 function post_family_tweaks__radxa_preset_configs() {
-	display_alert "$BOARD" "preset configs for rootfs" "info"
+	display_alert "$BOARD" "Preset Automatic first boot configuration" "info"
+	
+	# Set PRESET_CUSTOM_TTY=ttyAS0 if you want the serial console to run Automatic first boot configuration. If ttyAS0 is not logged in then fallback to tty1.
+	echo "PRESET_CUSTOM_TTY=ttyAS0" > "${SDCARD}"/root/.not_logged_in_yet
+	
 	# Set PRESET_NET_CHANGE_DEFAULTS to 1 to apply any network related settings below
 	echo "PRESET_NET_CHANGE_DEFAULTS=1" > "${SDCARD}"/root/.not_logged_in_yet
 
@@ -43,7 +46,7 @@ function post_family_tweaks__radxa_preset_configs() {
 	echo "PRESET_NET_WIFI_KEY='MyWiFiKEY'" >> "${SDCARD}"/root/.not_logged_in_yet
 
 	#      Country code to enable power ratings and channels for your country. eg: GB US DE | https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
-	echo "PRESET_NET_WIFI_COUNTRYCODE='US'" >> "${SDCARD}"/root/.not_logged_in_yet
+	echo "PRESET_NET_WIFI_COUNTRYCODE='CA'" >> "${SDCARD}"/root/.not_logged_in_yet
 
 	#If you want to use a static ip, set it here
 	echo "PRESET_NET_USE_STATIC=1" >> "${SDCARD}"/root/.not_logged_in_yet
@@ -62,10 +65,10 @@ function post_family_tweaks__radxa_preset_configs() {
 	echo "SET_LANG_BASED_ON_LOCATION=y" >> "${SDCARD}"/root/.not_logged_in_yet
 
 	# Preset default locale
-	echo "PRESET_LOCALE=en_US.UTF-8" >> "${SDCARD}"/root/.not_logged_in_yet
+	echo "PRESET_LOCALE=en_CA.UTF-8" >> "${SDCARD}"/root/.not_logged_in_yet
 
 	# Preset timezone
-	echo "PRESET_TIMEZONE=Etc/UTC" >> "${SDCARD}"/root/.not_logged_in_yet
+	echo "PRESET_TIMEZONE=America/Toronto" >> "${SDCARD}"/root/.not_logged_in_yet
 
 	# Preset root password
 	echo "PRESET_ROOT_PASSWORD=radxa" >> "${SDCARD}"/root/.not_logged_in_yet
