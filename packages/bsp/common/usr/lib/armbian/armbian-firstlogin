@@ -639,11 +639,111 @@ add_user() {
 
 if [[ -f /root/.not_logged_in_yet && -n $(tty) ]]; then
 
-	. /root/.not_logged_in_yet
+	# Define the path to the user's configuration file
+	CONFIGURATION_FILE="/root/.not_logged_in_yet"
+
+	PRESET_CONFIGURATION=""
+	PRESET_CONFIGURATION=$(grep '^PRESET_CONFIGURATION=' "$CONFIGURATION_FILE" 2>/dev/null | awk -F'=' '{print $2}' | tr -d '"' | tr -d "'")
 
 	# override configuration from URL
 	if [[ -n "${PRESET_CONFIGURATION}" ]]; then
 		curl --retry 5 --connect-timeout 3 "${PRESET_CONFIGURATION}" > /root/.not_logged_in_yet 2> /dev/null
+	fi
+
+	# Get the name of the current terminal device (e.g., tty1 or ttyS0)
+	CURRENT_TTY_DEVICE=$(tty | sed 's#/dev/##')
+
+	# Check if the file /root/.not_logged_in_yet has content (size > 0).
+	if [ -s "$CONFIGURATION_FILE" ]; then
+		
+		PRESET_CUSTOM_TTY=""
+				
+		# Use grep to find the line starting with PRESET_CUSTOM_TTY, then awk to extract the value after the =
+		# Suppress grep errors if the pattern isn't found
+		PRESET_CUSTOM_TTY=$(grep '^PRESET_CUSTOM_TTY=' "$CONFIGURATION_FILE" 2>/dev/null | awk -F'=' '{print $2}' | tr -d '"' | tr -d "'")
+
+		# Define the Priority List of TTYs to check (Order matters: First to Last Priority)
+		FALLBACK_PRIORITY_TTYS=("tty1" "ttyS0" "ttyAS0" "ttyAMA0" "ttyACM0" "tty2" "tty3" "tty4" "tty5" "tty6")
+		
+		# Define the TTY we want to prioritize waiting for
+		PRIORITY_TARGET="tty1"
+				
+		# Build the final priority list:
+		# If a custom pref is defined, it goes to the front of the list.
+		if [ -n "$PRESET_CUSTOM_TTY" ]; then
+			PRIORITY_TTYS=("$PRESET_CUSTOM_TTY" "${FALLBACK_PRIORITY_TTYS[@]}")
+			PRIORITY_TARGET="$PRESET_CUSTOM_TTY"
+		else
+			# If not set, just use the standard fallback list
+			PRIORITY_TTYS=("${FALLBACK_PRIORITY_TTYS[@]}")
+		fi   
+		
+		# --- FIX FOR RACE CONDITION ---
+		WAIT_TIMEOUT=15  # Wait up to 15 seconds
+
+		echo "Waiting up to ${WAIT_TIMEOUT} seconds for ${PRIORITY_TARGET} to become active..."
+
+		# Loop until the TTY is logged in ('who' finds it) or timeout occurs
+		for i in $(seq 1 $WAIT_TIMEOUT); do
+			if who | awk '{print $2}' | grep -q "^${PRIORITY_TARGET}$"; then
+				echo "${PRIORITY_TARGET} is now active. Proceeding with configuration."
+				break # Exit the wait loop
+			fi
+			sleep 1
+			# If we reach the end of the loop, the script will proceed anyway, potentially falling back to the next active tty in the list.
+		done
+		# --------------------------------
+					
+		# Use 'who' to get a list of all currently logged-in TTY names, one per line
+		LOGGED_IN_TTYS=$(who | awk '{print $2}')
+					
+		# Convert the multi-line output into a shell array for easier searching
+		if command -v readarray >/dev/null; then
+			readarray -t LOGGED_IN_ARRAY <<<"$LOGGED_IN_TTYS"
+		else
+			# Fallback for older shells using a while loop
+			unset LOGGED_IN_ARRAY
+			while read line; do LOGGED_IN_ARRAY+=("$line"); done <<< "$LOGGED_IN_TTYS"
+		fi
+
+		# Highest Priority active TTY initialization
+		HIGHEST_PRIORITY_ACTIVE=""
+					
+		# Iterate through the priority list to find the first active TTY
+		for TARGET in "${PRIORITY_TTYS[@]}"; do
+			# Check if the current priority TTY exists in our dynamic list of logged-in TTYs
+			if [[ " ${LOGGED_IN_ARRAY[@]} " =~ " ${TARGET} " ]]; then
+		    		HIGHEST_PRIORITY_ACTIVE="$TARGET"
+		    		# Break the loop immediately after finding the first one
+		    		break
+			fi
+		done 
+					
+		# --- Execution Phase ---
+		# If Highest Priority active TTY found
+		if [ -n "$HIGHEST_PRIORITY_ACTIVE" ]; then
+			if [ "$CURRENT_TTY_DEVICE" = "$HIGHEST_PRIORITY_ACTIVE" ]; then
+		    		# Source the configuration file to set variables in the current shell instance
+		    		. "$CONFIGURATION_FILE" 
+		    		echo "Automatic first boot configuration will be executed during this run." 
+		    	else
+        			# This is the WRONG TTY.
+        			clear
+				# In case VENDORPRETTYNAME is defined, display that
+				[[ -n "${VENDORPRETTYNAME}" ]] && VENDOR="$VENDORPRETTYNAME"
+				echo -e "Welcome to \e[1m\e[97m${VENDOR}\x1B[0m! \n"
+				echo -e "Documentation: \e[1m\e[92m${VENDORDOCS}\x1B[0m | Community support: \e[1m\e[92m${VENDORSUPPORT}\x1B[0m\n"
+
+				echo "" # empty line
+				
+				# Try to get the local IP address (script halts until IP was found or x retries were done)
+				get_local_ip_addr
+        			exit 0     			
+			fi
+		else
+			# This else block executes only if NO TTY in the list was logged in.
+			echo "No TTYs in the priority list are currently logged in. Automatic first boot configuration will not run."       			
+		fi
 	fi
 
 	do_firstrun_automated_network_configuration
@@ -744,10 +844,6 @@ if [[ -f /root/.not_logged_in_yet && -n $(tty) ]]; then
 		if [ -z "$PRESET_ROOT_PASSWORD" ];then
 			read_password "Create root"
 		else
-			# allow automated install also in interactive session
-			#if [ "$(who am i | awk '{print $2}')" != "tty1" ];then
-			#	exit
-			#fi
 			password="$PRESET_ROOT_PASSWORD"
 			# download SSH key if defined
 			if [[ -n "${PRESET_ROOT_KEY}" ]]; then
@@ -755,18 +851,6 @@ if [[ -f /root/.not_logged_in_yet && -n $(tty) ]]; then
 				curl --retry 5 --connect-timeout 3 "${PRESET_ROOT_KEY}" > /root/.ssh/authorized_keys 2> /dev/null
 			fi
 		fi
-
-		# Get current session identifiers
-		current_tty=$(tty | sed 's:/dev/::')  # e.g., "tty1"
-		current_pid=$$
-
-		# Kill ONLY other active root SHELL sessions (not login processes)
-		ps -u root -o pid,tty,comm |
-		  awk -v me="$current_tty" -v mypid="$current_pid" '
-		    NR>1 && $2 != "?" && $2 != me && $1 != mypid && $3 ~ /sh$/ {
-		      print $1
-		    }' |
-		  xargs --no-run-if-empty kill -9
 
 		# enable motd
 		chmod +x /etc/update-motd.d/*
@@ -926,7 +1010,7 @@ if [[ -f /root/.not_logged_in_yet && -n $(tty) ]]; then
 				systemctl start armbian-disable-autologin.timer
 			fi
 			# logout if logged at console
-			who -la | grep root | grep -q tty1 && exit 1
+			who -la | grep root | grep -q ${CURRENT_TTY_DEVICE} && exit 1
 		fi
 
 	elif [[ "${desktop_dm}" == "gdm3" ]] && [ -n "$RealName" ]; then
@@ -957,7 +1041,7 @@ if [[ -f /root/.not_logged_in_yet && -n $(tty) ]]; then
 				) &
 			fi
 			# logout if logged at console
-			who -la | grep root | grep -q tty1 && exit 1
+			who -la | grep root | grep -q ${CURRENT_TTY_DEVICE} && exit 1
 		fi
 	elif [[ "${desktop_dm}" == "sddm" ]] && [ -n "$RealName" ]; then
 
@@ -987,7 +1071,7 @@ if [[ -f /root/.not_logged_in_yet && -n $(tty) ]]; then
 			systemctl -q enable armbian-disable-autologin.timer
 		fi
 		# logout if logged at console
-		who -la | grep root | grep -q tty1 && exit 1
+		who -la | grep root | grep -q ${CURRENT_TTY_DEVICE} && exit 1
 
 	else
 		# no display manager detected -> clear screen and show motd
