@@ -7,30 +7,17 @@ BOOT_LOGO="desktop"
 KERNEL_TARGET="legacy"
 SRC_EXTLINUX="yes"
 UBOOT_EXTLINUX_ROOT="root=UUID=%%ROOT_PARTUUID%%"
-SRC_CMDLINE="earlycon=sunxi-uart,0x02500000,115200 console=ttyAS0,115200n8 console=tty1 video=HDMI-A-1:1920x1080@60e fbcon=map:0 rootwait coherent_pool=2M irqchip.gicv3_pseudo_nmi=0 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory swapaccount=1 kasan=off"
+SRC_CMDLINE="earlycon=sunxi-uart,0x02500000,115200 console=ttyAS0,115200n8 console=tty1 rootwait coherent_pool=2M irqchip.gicv3_pseudo_nmi=0 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory swapaccount=1 kasan=off"
 BOOTSCRIPT="extlinux.conf"
-# Force explicit DTB path in extlinux.conf (not fdtdir auto-detect)
 BOOT_FDT_FILE="allwinner/sun60i-a733-cubie-a7a.dtb"
-# Override initrd name - booti requires raw initrd for ARM64, not uInitrd wrapper
 NAME_INITRD="initrd.img-5.15.147-legacy-sun60iw2"
-# Disable uInitrd wrapper - booti requires raw initrd for ARM64
 EXTLINUX_UINITRD="no"
-IMAGE_PARTITION_TABLE="gpt"
-#IMAGE_PARTITION_TABLE="msdos"
-BOOTFS_TYPE="fat"
-# U-Boot writes boot_package.fex at 12MiB, so boot partition must start after that
 OFFSET=16
-BOOTSTART="1"
-BOOTSIZE="512"
-ROOTSTART="513"
 enable_extension "radxa-aic8800"
 AIC8800_TYPE="usb"
 
 function post_family_tweaks__radxa_preset_configs() {
 	display_alert "$BOARD" "Preset Automatic first boot configuration" "info"
-	
-	# Set PRESET_CUSTOM_TTY=ttyAS0 if you want the serial console to run Automatic first boot configuration. If ttyAS0 is not logged in then fallback to tty1.
-	echo "PRESET_CUSTOM_TTY=ttyAS0" > "${SDCARD}"/root/.not_logged_in_yet
 	
 	# Set PRESET_NET_CHANGE_DEFAULTS to 1 to apply any network related settings below
 	echo "PRESET_NET_CHANGE_DEFAULTS=1" > "${SDCARD}"/root/.not_logged_in_yet
