@@ -27,7 +27,7 @@ new file mode 100644
 index 000000000000..215ba9dbcdcc
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-h618-x98h.dts
-@@ -0,0 +1,271 @@
+@@ -0,0 +1,301 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * Copyright (C) 2023 Arm Ltd.
@@ -84,12 +84,20 @@ index 000000000000..215ba9dbcdcc
 +		regulator-always-on;
 +	};
 +
-+	reg_3v3_wifi: vcc3v3-wifi {
++	reg_vcc_wifi: reg_vcc_wifi {
 +		compatible = "regulator-fixed";
-+		regulator-name = "vcc-3v3-wifi";
++		regulator-name = "vcc-wifi";
 +		regulator-min-microvolt = <3300000>;
 +		regulator-max-microvolt = <3300000>;
++		// gpio = <&pio 6 18 GPIO_ACTIVE_HIGH>; /* PG18 = WL_REG_ON */
++		enable-active-high;
 +		regulator-always-on;
++	};
++
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&pio 6 18 GPIO_ACTIVE_LOW>;
++		// No external clock needed (chip has its own crystal)
 +	};
 +};
 +
@@ -172,14 +180,22 @@ index 000000000000..215ba9dbcdcc
 +};
 +
 +&mmc1 {
-+	vmmc-supply = <&reg_vcc3v3>;
++	vmmc-supply = <&reg_vcc3v3>;   /* power controlled by PG18 */
++	// vqmmc-supply = <&reg_vcc_wifi>;     /* IO voltage (1.8V) */
++	mmc-pwrseq = <&wifi_pwrseq>;
 +	bus-width = <4>;
 +	non-removable;
++	// no-sd;
++	// no-mmc;
 +	max-frequency = <35000000>;
 +	status = "okay";
 +
 +	wlan: wifi@1 {
 +		reg = <1>;
++		interrupt-parent = <&pio>;
++		interrupts = <6 15 IRQ_TYPE_EDGE_RISING>; /* PG15 WL_HOSTWAKE */
++		interrupt-names = "host-wake";
++		// local-mac-address = [8a 00 33 77 4f 00]; /
 +	};
 +};
 +
@@ -264,6 +280,20 @@ index 000000000000..215ba9dbcdcc
 +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
 +	uart-has-rtscts;
 +	status = "okay";
++
++	bluetooth {
++		compatible = "allwinner,sunxi-btlpm";
++        // max-speed = <1500000>;
++
++		clocks = <&rtc 1>;
++		clock-names = "lpo";
++		vbat-supply = <&reg_dldo1>;
++		vddio-supply = <&reg_dldo1>;
++		enable-gpios = <&pio 6 19 GPIO_ACTIVE_HIGH>;    /* PH19 bt_power */
++		reset-gpios  = <&pio 6 13 GPIO_ACTIVE_LOW>;     /* PH13 bt_rst_n */
++		device-wakeup-gpios = <&pio 6 17 GPIO_ACTIVE_HIGH>; /* PH17 bt_wake */
++		host-wakeup-gpios   = <&pio 6 16 GPIO_ACTIVE_HIGH>; /* PH16 bt_hostwake */
++	};
 +};
 +
 +&usbotg {
