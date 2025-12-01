@@ -1,0 +1,21 @@
+From 23580e3650e6ebc793a339a8ef5fe6fc521618d2 Mon Sep 17 00:00:00 2001
+From: Nick Alilovic <nickalilovic@gmail.com>
+Date: Sun, 30 Nov 2025 22:45:17 -0500
+Subject: [PATCH] Add secure boot
+
+---
+ configs/transpeed-8k618-t_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/configs/transpeed-8k618-t_defconfig b/configs/transpeed-8k618-t_defconfig
+index 221614762e8..43b2f0e0aed 100644
+--- a/configs/transpeed-8k618-t_defconfig
++++ b/configs/transpeed-8k618-t_defconfig
+@@ -25,3 +25,4 @@ CONFIG_AXP313_POWER=y
+ CONFIG_AXP_DCDC3_VOLT=1360
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
++CONFIG_SPL_IMAGE_TYPE_SUNXI_TOC0=y
+-- 
+2.43.0
+
