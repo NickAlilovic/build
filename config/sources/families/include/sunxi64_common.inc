@@ -9,10 +9,10 @@
 enable_extension "sunxi-tools"
 declare -g ARCH=arm64
 declare -g ATF_TARGET_MAP="PLAT=$ATF_PLAT DEBUG=1 bl31;;build/$ATF_PLAT/debug/bl31.bin"
-declare -g ATFBRANCH="tag:lts-v2.12.4"
+declare -g ATFBRANCH="tag:v2.14.0"
 declare -g BOOTDELAY=1
-declare -g BOOTPATCHDIR="${BOOTPATCHDIR:-"u-boot-sunxi"}"
-declare -g BOOTBRANCH="${BOOTBRANCH:-"tag:v2024.01"}"
+declare -g BOOTPATCHDIR="${BOOTPATCHDIR:-"u-boot-mainline"}"
+declare -g BOOTBRANCH="${BOOTBRANCH:-"tag:v2025.10"}"
 declare -g BOOTENV_FILE='sunxi.txt'
 declare -g UBOOT_TARGET_MAP="${UBOOT_TARGET_MAP:-BINMAN_ALLOW_MISSING=1;;u-boot-sunxi-with-spl.bin}"
 declare -g BOOTSCRIPT='boot-sun50i-next.cmd:boot.cmd'
@@ -35,8 +35,9 @@ case $BRANCH in
 		;;
 
 	edge)
-		declare -g KERNEL_MAJOR_MINOR="6.16" # Major and minor versions of this kernel.
-		declare -g KERNELBRANCH="tag:v6.16.8"
+		declare -g KERNEL_MAJOR_MINOR="6.18-rc1" # Major and minor versions of this kernel.
+		declare -g KERNELSOURCE='https://github.com/jernejsk/linux-1'
+		declare -g KERNELBRANCH='branch:sun4i-drm-refactor'
 		;;
 esac
 
