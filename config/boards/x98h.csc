@@ -7,6 +7,7 @@ OVERLAY_PREFIX="sun50i-h616"
 BOOT_LOGO="desktop"
 KERNEL_TARGET="edge"
 FORCE_BOOTSCRIPT_UPDATE="yes"
+BOOTFS_TYPE="fat"
 
 function post_family_tweaks__x98h() {
 	display_alert "Applying wifi firmware"

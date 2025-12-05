@@ -9,6 +9,7 @@ KERNEL_TEST_TARGET="edge"
 FORCE_BOOTSCRIPT_UPDATE="yes"
 OVERLAY_PREFIX="sun50i-h616"
 enable_extension "uwe5622-allwinner"
+BOOTFS_TYPE="fat"
 
 function post_family_config_branch_edge__different_dtb_for_edge() {
 	declare -g BOOT_FDT_FILE="allwinner/sun50i-h313-x96-q.dtb"

@@ -7,6 +7,7 @@ OVERLAY_PREFIX="sun50i-h616"
 BOOT_LOGO="desktop"
 KERNEL_TARGET="edge,dev"
 FORCE_BOOTSCRIPT_UPDATE="yes"
+BOOTFS_TYPE="fat"
 
 function post_family_tweaks__tanix_tx6s_axp313() {
     display_alert "$BOARD" "Installing board tweaks" "info"

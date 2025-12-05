@@ -7,6 +7,7 @@ OVERLAY_PREFIX="sun50i-h616"
 BOOT_LOGO="desktop"
 KERNEL_TARGET="edge,dev"
 FORCE_BOOTSCRIPT_UPDATE="yes"
+BOOTFS_TYPE="fat"
 
 function post_family_tweaks__transpeed_8k618-t() {
     display_alert "$BOARD" "Installing board tweaks" "info"

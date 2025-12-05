@@ -7,6 +7,7 @@ OVERLAY_PREFIX="sun50i-h616"
 BOOT_LOGO="desktop"
 KERNEL_TARGET="edge,dev"
 FORCE_BOOTSCRIPT_UPDATE="yes"
+BOOTFS_TYPE="fat"
 
 enable_extension "uwe5622-allwinner"
 
