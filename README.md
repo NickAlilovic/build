@@ -2,7 +2,7 @@
   <a href="#build-framework">
   <img src=".github/armbian-logo.png" alt="Armbian logo" width="144">
   </a><br>
-  <strong>Armbian Linux Build Framework</strong><br>
+  <strong>Allwinner TVBOX - Armbian Linux Build Framework</strong><br>
 <br>
 </p>
 
