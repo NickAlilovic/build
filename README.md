@@ -24,7 +24,7 @@ It ensures **consistency across devices** while remaining modular and extensible
 ### Quick Start
 
 ```bash
-git clone https://github.com/armbian/build
+git clone https://github.com/NickAlilovic/build.git --branch v20251014
 cd build
 ./compile.sh
 ```
