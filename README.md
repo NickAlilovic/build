@@ -27,7 +27,7 @@ For stable branch use `--branch=v24.11`
 
 ```bash
 apt-get -y install git
-git clone --depth=1 --branch=v20250306 https://github.com/NickAlilovic/build.git --branch
+git clone https://github.com/NickAlilovic/build.git --branch=v20250306
 cd build
 ./compile.sh
 ```
