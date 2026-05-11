@@ -1,15 +1,15 @@
-From 34293e1c0457284845b378d36c0ee5cbe9854b70 Mon Sep 17 00:00:00 2001
+From d055ae598d012afad62e73dfc7c3208fc7657ffc Mon Sep 17 00:00:00 2001
 From: Armbian Builder <support@armbian.com>
-Date: Thu, 7 May 2026 18:00:06 +0000
-Subject: [PATCH] Add Allwinner Device a733 86863dfe62
+Date: Mon, 11 May 2026 09:12:27 +0000
+Subject: [PATCH] Add Allwinner Device a733 9860a0eff6
 
 ---
- .../dts/allwinner/sun60i-a733-cubie-a7a.dts   | 2179 +++++++
- .../dts/allwinner/sun60i-a733-cubie-a7s.dts   | 1566 ++++++
- .../dts/allwinner/sun60i-a733-cubie-a7z.dts   | 1538 +++++
+ .../dts/allwinner/sun60i-a733-cubie-a7a.dts   | 2050 +++++++
+ .../dts/allwinner/sun60i-a733-cubie-a7s.dts   | 1548 +++++
+ .../dts/allwinner/sun60i-a733-cubie-a7z.dts   | 1528 +++++
  .../boot/dts/allwinner/sun60iw2p1-cpu-vf.dtsi | 2176 +++++++
  arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi | 5006 +++++++++++++++++
- 5 files changed, 12465 insertions(+)
+ 5 files changed, 12308 insertions(+)
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
@@ -18,10 +18,10 @@ Subject: [PATCH] Add Allwinner Device a733 86863dfe62
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
 new file mode 100644
-index 000000000000..cc6dece5cd47
+index 000000000000..e27b88fe4529
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
-@@ -0,0 +1,2179 @@
+@@ -0,0 +1,2050 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +
 +/dts-v1/;
@@ -30,7 +30,7 @@ index 000000000000..cc6dece5cd47
 +#define TYPEC_DP 1
 +/{
 +	board = "A733", "A733-CUBIE-A7A-AXP318";
-+	compatible = "radxa,cubie-a7a", "arm,sun60iw2p1";
++	compatible = "radxa,cubie-a7a", "arm,sun60iw2p1", "allwinner,sun60i-a733";
 +
 +	reg_usb0_vbus: usb0-vbus {
 +		compatible = "regulator-fixed";
@@ -793,6 +793,34 @@ index 000000000000..cc6dece5cd47
 +	};
 +};
 +
++&sdc0 {
++	bus-width = <4>;
++	cd-gpios = <&pio PF 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
++	/*non-removable;*/
++	/*broken-cd;*/
++	/*cd-inverted*/
++	/*data3-detect;*/
++	/*card-pwr-gpios = <&pio PH 14 1 1 2 0xffffffff>;*/
++	cd-used-24M;
++	cd-set-debounce = <0x1>;
++	cap-sd-highspeed;
++	sd-uhs-sdr50;
++	sd-uhs-ddr50;
++	sd-uhs-sdr104;
++	no-sdio;
++	no-mmc;
++	sunxi-power-save-mode;
++	/*sunxi-dis-signal-vol-sw;*/
++	max-frequency = <200000000>;
++	ctl-spec-caps = <0x428>;
++	vmmc-supply = <&reg_dc1sw2>;
++	vqmmc33sw-supply = <&reg_dc1sw2>;
++	vdmmc33sw-supply = <&reg_dc1sw2>;
++	vqmmc18sw-supply = <&reg_cldo5>;
++	vdmmc18sw-supply = <&reg_cldo5>;
++	status = "okay";
++};
++
 +&sdc2 {
 +	non-removable;
 +	bus-width = <8>;
@@ -822,57 +850,7 @@ index 000000000000..cc6dece5cd47
 +	vcc-supply = <&reg_dldo6>;
 +	vccq-supply = <&reg_dcdc8>;
 +	vccq2-supply = <&reg_dcdc8>;
-+	status = "okay";
-+};
-+
-+&sdc1 {
-+	bus-width = <4>;
-+	no-mmc;
-+	no-sd;
-+	cap-sd-highspeed;
-+	/*sd-uhs-sdr12*/
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr50;
-+	sd-uhs-ddr50;
-+	sd-uhs-sdr104;
-+	/*sunxi-power-save-mode;*/
-+	sunxi-dis-signal-vol-sw;
-+	cap-sdio-irq;
-+	keep-power-in-suspend;
-+	ignore-pm-notify;
-+	execute_tuning_in_kernel;
-+	max-frequency = <208000000>;
-+	sunxi-dly-208M  = <0 0 0 0 0 0>;
-+	ctl-spec-caps = <0x428>;
 +	status = "disabled";
-+};
-+
-+&sdc0 {
-+	bus-width = <4>;
-+	cd-gpios = <&pio PF 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
-+	/*non-removable;*/
-+	/*broken-cd;*/
-+	/*cd-inverted*/
-+	/*data3-detect;*/
-+	/*card-pwr-gpios = <&pio PH 14 1 1 2 0xffffffff>;*/
-+	cd-used-24M;
-+	cd-set-debounce = <0x1>;
-+	cap-sd-highspeed;
-+	sd-uhs-sdr50;
-+	sd-uhs-ddr50;
-+	sd-uhs-sdr104;
-+	no-sdio;
-+	no-mmc;
-+	sunxi-power-save-mode;
-+	/*sunxi-dis-signal-vol-sw;*/
-+	max-frequency = <200000000>;
-+	ctl-spec-caps = <0x428>;
-+	vmmc-supply = <&reg_dc1sw2>;
-+	vqmmc33sw-supply = <&reg_dc1sw2>;
-+	vdmmc33sw-supply = <&reg_dc1sw2>;
-+	vqmmc18sw-supply = <&reg_cldo5>;
-+	vdmmc18sw-supply = <&reg_cldo5>;
-+	status = "okay";
 +};
 +
 +#ifdef TYPEC_DP
@@ -1133,22 +1111,25 @@ index 000000000000..cc6dece5cd47
 +				regulator-always-on;
 +			};
 +			reg_aldo2: aldo2 {
-+				regulator-name = "axp8191-aldo2";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-aldo2";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_aldo3: aldo3 {
-+				regulator-name = "axp8191-aldo3";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-aldo3";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_aldo4: aldo4 {
-+				regulator-name = "axp8191-aldo4";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-aldo4";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_aldo5: aldo5 {
 +				regulator-name = "axp8191-aldo5";
@@ -1157,10 +1138,11 @@ index 000000000000..cc6dece5cd47
 +				regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_aldo6: aldo6 {
-+				regulator-name = "axp8191-aldo6";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-aldo6";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_bldo1: bldo1 {
 +				regulator-name = "axp8191-bldo1";
@@ -1175,10 +1157,11 @@ index 000000000000..cc6dece5cd47
 +				regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_bldo3: bldo3 {
-+				regulator-name = "axp8191-bldo3";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-bldo3";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_bldo4: bldo4 {
 +				regulator-name = "axp8191-bldo4";
@@ -1215,10 +1198,11 @@ index 000000000000..cc6dece5cd47
 +				regulator-always-on;
 +			};
 +			reg_cldo4: cldo4 {
-+				regulator-name = "axp8191-cldo4";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3500000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-cldo4";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3500000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_cldo5: cldo5 {
 +				regulator-name = "axp8191-cldo5";
@@ -1237,28 +1221,32 @@ index 000000000000..cc6dece5cd47
 +				regulator-always-on;
 +			};
 +			reg_dldo2: dldo2 {
-+				regulator-name = "axp8191-dldo2";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-dldo2";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_dldo3: dldo3 {
-+				regulator-name = "axp8191-dldo3";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-dldo3";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_dldo4: dldo4 {
-+				regulator-name = "axp8191-dldo4";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-dldo4";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_dldo5: dldo5 {
-+				regulator-name = "axp8191-dldo5";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-dldo5";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_dldo6: dldo6 {
 +				regulator-name = "axp8191-dldo6";
@@ -1277,30 +1265,34 @@ index 000000000000..cc6dece5cd47
 +				regulator-always-on;
 +			};
 +			reg_eldo2: eldo2 {
-+				regulator-name = "axp8191-eldo2";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
-+				regulator-boot-on;
-+				regulator-always-on;
++				/* not connected */
++				// regulator-name = "axp8191-eldo2";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
++				// regulator-boot-on;
++				// regulator-always-on;
 +			};
 +			reg_eldo3: eldo3 {
-+				regulator-name = "axp8191-eldo3";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-eldo3";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_eldo4: eldo4 {
-+				regulator-name = "axp8191-eldo4";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-eldo4";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_eldo5: eldo5 {
-+				regulator-name = "axp8191-eldo5";
-+				regulator-min-microvolt = <500000>;
-+				regulator-max-microvolt = <3400000>;
-+				regulator-enable-ramp-delay = <1000>;
++				/* not connected */
++				// regulator-name = "axp8191-eldo5";
++				// regulator-min-microvolt = <500000>;
++				// regulator-max-microvolt = <3400000>;
++				// regulator-enable-ramp-delay = <1000>;
 +			};
 +			reg_eldo6: eldo6 {
 +				regulator-name = "axp8191-eldo6";
@@ -1320,127 +1312,6 @@ index 000000000000..cc6dece5cd47
 +				/* add always-on */
 +				regulator-always-on;
 +			};
-+		};
-+
-+		virtual-dcdc1 {
-+			compatible = "xpower-vregulator,dcdc1";
-+			dcdc1-supply = <&reg_dcdc1>;
-+		};
-+		virtual-dcdc2 {
-+			compatible = "xpower-vregulator,dcdc2";
-+			dcdc2-supply = <&reg_dcdc2>;
-+		};
-+		virtual-dcdc3 {
-+			compatible = "xpower-vregulator,dcdc3";
-+			dcdc3-supply = <&reg_dcdc3>;
-+		};
-+		virtual-dcdc4 {
-+			compatible = "xpower-vregulator,dcdc4";
-+			dcdc4-supply = <&reg_dcdc4>;
-+		};
-+		virtual-dcdc5 {
-+			compatible = "xpower-vregulator,dcdc5";
-+			dcdc5-supply = <&reg_dcdc5>;
-+		};
-+		virtual-dcdc6 {
-+			compatible = "xpower-vregulator,dcdc6";
-+			dcdc6-supply = <&reg_dcdc6>;
-+		};
-+		virtual-dcdc7 {
-+			compatible = "xpower-vregulator,dcdc7";
-+			dcdc7-supply = <&reg_dcdc7>;
-+		};
-+		virtual-dcdc8 {
-+			compatible = "xpower-vregulator,dcdc8";
-+			dcdc8-supply = <&reg_dcdc8>;
-+		};
-+		virtual-dcdc9 {
-+			compatible = "xpower-vregulator,dcdc9";
-+			dcdc9-supply = <&reg_dcdc9>;
-+		};
-+		virtual-rtcldo {
-+			compatible = "xpower-vregulator,rtcldo";
-+			rtcldo-supply = <&reg_rtcldo>;
-+		};
-+		virtual-aldo1 {
-+			compatible = "xpower-vregulator,aldo1";
-+			aldo1-supply = <&reg_aldo1>;
-+		};
-+		virtual-aldo2 {
-+			compatible = "xpower-vregulator,aldo2";
-+			aldo2-supply = <&reg_aldo2>;
-+		};
-+		virtual-aldo3 {
-+			compatible = "xpower-vregulator,aldo3";
-+			aldo3-supply = <&reg_aldo3>;
-+		};
-+		virtual-aldo4 {
-+			compatible = "xpower-vregulator,aldo4";
-+			aldo4-supply = <&reg_aldo4>;
-+		};
-+		virtual-aldo5 {
-+			compatible = "xpower-vregulator,aldo5";
-+			aldo5-supply = <&reg_aldo5>;
-+		};
-+		virtual-aldo6 {
-+			compatible = "xpower-vregulator,aldo6";
-+			aldo6-supply = <&reg_aldo6>;
-+		};
-+		virtual-dldo1 {
-+			compatible = "xpower-vregulator,dldo1";
-+			dldo1-supply = <&reg_dldo1>;
-+		};
-+		virtual-dldo2 {
-+			compatible = "xpower-vregulator,dldo2";
-+			dldo2-supply = <&reg_dldo2>;
-+		};
-+		virtual-dldo3 {
-+			compatible = "xpower-vregulator,dldo3";
-+			dldo3-supply = <&reg_dldo3>;
-+		};
-+		virtual-dldo4 {
-+			compatible = "xpower-vregulator,dldo4";
-+			dldo4-supply = <&reg_dldo4>;
-+		};
-+		virtual-dldo5 {
-+			compatible = "xpower-vregulator,dldo5";
-+			dldo5-supply = <&reg_dldo5>;
-+		};
-+		virtual-dldo6 {
-+			compatible = "xpower-vregulator,dldo6";
-+			dldo6-supply = <&reg_dldo6>;
-+		};
-+		virtual-eldo1 {
-+			compatible = "xpower-vregulator,eldo1";
-+			eldo1-supply = <&reg_eldo1>;
-+		};
-+		virtual-eldo2 {
-+			compatible = "xpower-vregulator,eldo2";
-+			eldo2-supply = <&reg_eldo2>;
-+		};
-+		virtual-eldo3 {
-+			compatible = "xpower-vregulator,eldo3";
-+			eldo3-supply = <&reg_eldo3>;
-+		};
-+		virtual-eldo4 {
-+			compatible = "xpower-vregulator,eldo4";
-+			eldo4-supply = <&reg_eldo4>;
-+		};
-+		virtual-eldo5 {
-+			compatible = "xpower-vregulator,eldo5";
-+			eldo5-supply = <&reg_eldo5>;
-+		};
-+		virtual-eldo6 {
-+			compatible = "xpower-vregulator,eldo6";
-+			eldo6-supply = <&reg_eldo6>;
-+		};
-+		virtual-dc1sw1 {
-+			compatible = "xpower-vregulator,dc1sw1";
-+			dc1sw-supply = <&reg_dc1sw1>;
-+		};
-+		virtual-dc1sw2 {
-+			compatible = "xpower-vregulator,dc1sw2";
-+			dc1sw-supply = <&reg_dc1sw2>;
 +		};
 +	};
 +};
@@ -2203,10 +2074,10 @@ index 000000000000..cc6dece5cd47
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
 new file mode 100644
-index 000000000000..d96817cedc27
+index 000000000000..87258df8a33e
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
-@@ -0,0 +1,1566 @@
+@@ -0,0 +1,1548 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +
 +/dts-v1/;
@@ -2856,17 +2727,6 @@ index 000000000000..d96817cedc27
 +		device_type = "auto_print";
 +		status = "okay";
 +	};
-+
-+	gpio_leds {
-+		compatible = "allwinner,sunxi-gpio-leds";
-+		supply-num = <1>;
-+		gpio1-supply = <&reg_dcdc1>;
-+		gpio-pins = <&pio PJ 26 GPIO_ACTIVE_HIGH>;
-+		pin-names = "standby_led";
-+		init-status = <GPIO_ACTIVE_HIGH>;
-+		status = "okay";
-+	};
-+
 +};
 +
 +&uart0 {
@@ -3055,14 +2915,7 @@ index 000000000000..d96817cedc27
 +	vdmmc33sw-supply = <&reg_dc1sw2>;
 +	vqmmc18sw-supply = <&reg_cldo5>;
 +	vdmmc18sw-supply = <&reg_cldo5>;
-+	status = "okay";
-+};
-+
-+&ufs {
-+	vcc-supply = <&reg_dldo6>;
-+	vccq-supply = <&reg_dcdc8>;
-+	vccq2-supply = <&reg_dcdc8>;
-+	status = "okay";
++	status = "disabled";
 +};
 +
 +/*
@@ -3775,10 +3628,10 @@ index 000000000000..d96817cedc27
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
 new file mode 100644
-index 000000000000..87b020d03329
+index 000000000000..71522a4fb1e1
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
-@@ -0,0 +1,1538 @@
+@@ -0,0 +1,1528 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +
 +/dts-v1/;
@@ -3827,7 +3680,7 @@ index 000000000000..87b020d03329
 +		compatible = "gpio-leds";
 +
 +		led-0 {
-+			label = "radxa:blue:user";
++			label = "radxa:green:sys";
 +			gpios = <&r_pio PM 2 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "heartbeat";
 +		};
@@ -4378,16 +4231,6 @@ index 000000000000..87b020d03329
 +	auto_print@54321 {
 +		reg = <0x0 0x54321 0x0 0x0>;
 +		device_type = "auto_print";
-+		status = "okay";
-+	};
-+
-+	gpio_leds {
-+		compatible = "allwinner,sunxi-gpio-leds";
-+		supply-num = <1>;
-+		gpio1-supply = <&reg_dcdc1>;
-+		gpio-pins = <&pio PJ 26 GPIO_ACTIVE_HIGH>;
-+		pin-names = "standby_led";
-+		init-status = <GPIO_ACTIVE_HIGH>;
 +		status = "okay";
 +	};
 +
