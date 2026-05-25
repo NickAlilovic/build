@@ -1,0 +1,248 @@
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index c94ae4794545..7e243de550af 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -982,7 +982,6 @@ config MMC_REALTEK_USB
+ config MMC_SUNXI
+ 	tristate "Allwinner sunxi SD/MMC Host Controller support"
+ 	depends on ARCH_SUNXI || COMPILE_TEST
+-	depends on SUNXI_CCU
+ 	help
+ 	  This selects support for the SD/MMC Host Controller on
+ 	  Allwinner sunxi SoCs.
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 8dbcff53a631..7493cfce5ae8 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -36,6 +36,8 @@
+ #include <linux/scatterlist.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
++#include <linux/pinctrl/pinconf.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ /* register offset definitions */
+ #define SDXC_REG_GCTRL	(0x00) /* SMC Global Control Register */
+@@ -277,6 +279,9 @@ struct sunxi_mmc_host {
+ 
+ 	/* clock management */
+ 	struct clk	*clk_ahb;
++	struct clk	*clk_mmc_mbus;
++	struct clk	*clk_mmc_store;
++	struct clk	*clk_mmc_msi_lite;
+ 	struct clk	*clk_mmc;
+ 	struct clk	*clk_sample;
+ 	struct clk	*clk_output;
+@@ -296,6 +301,11 @@ struct sunxi_mmc_host {
+ 	struct mmc_request *manual_stop_mrq;
+ 	int		ferror;
+ 
++	/* pinctrl handles */
++	struct pinctrl *pinctrl;
++	struct pinctrl_state *pins_default;
++	struct pinctrl_state *pins_bias_1v8;
++
+ 	/* vqmmc */
+ 	bool		vqmmc_enabled;
+ 
+@@ -791,8 +801,14 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 		clock <<= 1;
+ 	}
+ 
++	if (host->use_new_timings) {
++		clock <<= 1;
++	}
++
+ 	if (host->use_new_timings && host->cfg->ccu_has_timings_switch) {
++#ifdef CONFIG_SUNXI_CCU
+ 		ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
++#endif
+ 		if (ret) {
+ 			dev_err(mmc_dev(mmc),
+ 				"error setting new timing mode\n");
+@@ -839,6 +855,13 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 		mmc_writel(host, REG_SD_NTSR, rval);
+ 	}
+ 
++	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
++	    (host->use_new_timings ||
++	     ios->bus_width == MMC_BUS_WIDTH_8))
++		ios->clock = rate >> 1;
++	else if (host->use_new_timings)
++		ios->clock = rate;
++
+ 	/* sunxi_mmc_clk_set_phase expects the actual card clock rate */
+ 	ret = sunxi_mmc_clk_set_phase(host, ios, rate);
+ 	if (ret)
+@@ -957,18 +980,40 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ static int sunxi_mmc_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	int ret;
++	struct sunxi_mmc_host *host = mmc_priv(mmc);
+ 
+ 	/* vqmmc regulator is available */
+ 	if (!IS_ERR(mmc->supply.vqmmc)) {
+ 		ret = mmc_regulator_set_vqmmc(mmc, ios);
+-		return ret < 0 ? ret : 0;
++		if (ret)
++			return -EIO;
+ 	}
+ 
+-	/* no vqmmc regulator, assume fixed regulator at 3/3.3V */
+-	if (mmc->ios.signal_voltage == MMC_SIGNAL_VOLTAGE_330)
++	switch (ios->signal_voltage) {
++	case MMC_SIGNAL_VOLTAGE_330:
++		if (!IS_ERR(host->pins_default)) {
++			ret = pinctrl_select_state(host->pinctrl, host->pins_default);
++			if (ret)
++				dev_warn(mmc_dev(mmc), "Cannot select 3.3v pio mode\n");
++			else
++				dev_info(mmc_dev(mmc), "select 3.3v pio mode\n");
++		}
+ 		return 0;
+-
+-	return -EINVAL;
++	case MMC_SIGNAL_VOLTAGE_180:
++		if (!IS_ERR(host->pins_bias_1v8)) {
++			ret = pinctrl_select_state(host->pinctrl, host->pins_bias_1v8);
++			if (ret)
++				dev_warn(mmc_dev(mmc), "Cannot select 1.8v pio mode\n");
++			else
++				dev_info(mmc_dev(mmc), "select 1.8v pio mode\n");
++		}
++		return 0;
++	default:
++		/* No signal voltage switch required */
++		dev_err(mmc_dev(mmc), "unknown signal voltage switch request %x\n",
++			ios->signal_voltage);
++		return -EINVAL;
++	}
+ }
+ 
+ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+@@ -1242,10 +1287,28 @@ static int sunxi_mmc_enable(struct sunxi_mmc_host *host)
+ 		goto error_assert_reset;
+ 	}
+ 
++	ret = clk_prepare_enable(host->clk_mmc_mbus);
++	if (ret) {
++		dev_err(host->dev, "Enable mmc_mbus clk err %d\n", ret);
++		goto error_disable_clk_ahb;
++	}
++
++	ret = clk_prepare_enable(host->clk_mmc_store);
++	if (ret) {
++		dev_err(host->dev, "Enable mmc_store clk err %d\n", ret);
++		goto error_disable_clk_mmc_mbus;
++	}
++
++	ret = clk_prepare_enable(host->clk_mmc_msi_lite);
++	if (ret) {
++		dev_err(host->dev, "Enable mmc_msi_lite clk err %d\n", ret);
++		goto error_disable_clk_mmc_store;
++	}
++
+ 	ret = clk_prepare_enable(host->clk_mmc);
+ 	if (ret) {
+ 		dev_err(host->dev, "Enable mmc clk err %d\n", ret);
+-		goto error_disable_clk_ahb;
++		goto error_disable_clk_mmc_msi_lite;
+ 	}
+ 
+ 	ret = clk_prepare_enable(host->clk_output);
+@@ -1276,6 +1339,12 @@ static int sunxi_mmc_enable(struct sunxi_mmc_host *host)
+ 	clk_disable_unprepare(host->clk_output);
+ error_disable_clk_mmc:
+ 	clk_disable_unprepare(host->clk_mmc);
++error_disable_clk_mmc_msi_lite:
++	clk_disable_unprepare(host->clk_mmc_msi_lite);
++error_disable_clk_mmc_store:
++	clk_disable_unprepare(host->clk_mmc_store);
++error_disable_clk_mmc_mbus:
++	clk_disable_unprepare(host->clk_mmc_mbus);
+ error_disable_clk_ahb:
+ 	clk_disable_unprepare(host->clk_ahb);
+ error_assert_reset:
+@@ -1291,6 +1360,9 @@ static void sunxi_mmc_disable(struct sunxi_mmc_host *host)
+ 	clk_disable_unprepare(host->clk_sample);
+ 	clk_disable_unprepare(host->clk_output);
+ 	clk_disable_unprepare(host->clk_mmc);
++	clk_disable_unprepare(host->clk_mmc_msi_lite);
++	clk_disable_unprepare(host->clk_mmc_store);
++	clk_disable_unprepare(host->clk_mmc_mbus);
+ 	clk_disable_unprepare(host->clk_ahb);
+ 
+ 	if (!IS_ERR(host->reset))
+@@ -1310,6 +1382,18 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ 	if (ret)
+ 		return ret;
+ 
++	host->pinctrl = devm_pinctrl_get(&pdev->dev);
++	if (IS_ERR(host->pinctrl))
++		dev_warn(&pdev->dev, "Could not get pinctrl, check if needed\n");
++
++	host->pins_default = pinctrl_lookup_state(host->pinctrl, PINCTRL_STATE_DEFAULT);
++	if (IS_ERR(host->pins_default))
++		dev_warn(&pdev->dev, "Could not get default pinstate, check if needed\n");
++
++	host->pins_bias_1v8 = pinctrl_lookup_state(host->pinctrl, "mmc_1v8");
++	if (IS_ERR(host->pins_bias_1v8))
++		dev_warn(&pdev->dev, "Could not get pin bias hs pinstate, check if needed\n");
++
+ 	host->reg_base = devm_platform_ioremap_resource(pdev, 0);
+ 	if (IS_ERR(host->reg_base))
+ 		return PTR_ERR(host->reg_base);
+@@ -1340,6 +1424,10 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ 		}
+ 	}
+ 
++	host->clk_mmc_mbus = devm_clk_get_optional(&pdev->dev, "mmc_mbus");
++	host->clk_mmc_store = devm_clk_get_optional(&pdev->dev, "mmc_store");
++	host->clk_mmc_msi_lite = devm_clk_get_optional(&pdev->dev, "mmc_msi_lite");
++
+ 	host->reset = devm_reset_control_get_optional_exclusive(&pdev->dev,
+ 								"ahb");
+ 	if (PTR_ERR(host->reset) == -EPROBE_DEFER)
+@@ -1384,13 +1472,16 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	host->sg_cpu = dma_alloc_coherent(&pdev->dev, PAGE_SIZE,
++	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
++	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
++	host->sg_cpu = dma_alloc_coherent(&pdev->dev, PAGE_SIZE * 4,
+ 					  &host->sg_dma, GFP_KERNEL);
+ 	if (!host->sg_cpu)
+ 		return dev_err_probe(&pdev->dev, -ENOMEM,
+ 				     "Failed to allocate DMA descriptor mem\n");
+ 
+ 	if (host->cfg->ccu_has_timings_switch) {
++#ifdef CONFIG_SUNXI_CCU
+ 		/*
+ 		 * Supports both old and new timing modes.
+ 		 * Try setting the clk to new timing mode.
+@@ -1399,6 +1490,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 
+ 		/* And check the result */
+ 		ret = sunxi_ccu_get_mmc_timing_mode(host->clk_mmc);
++#endif
+ 		if (ret < 0) {
+ 			/*
+ 			 * For whatever reason we were not able to get
+@@ -1417,14 +1509,14 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 	mmc->ops		= &sunxi_mmc_ops;
+ 	mmc->max_blk_count	= 8192;
+ 	mmc->max_blk_size	= 4096;
+-	mmc->max_segs		= PAGE_SIZE / sizeof(struct sunxi_idma_des);
++	mmc->max_segs		= PAGE_SIZE * 4 / sizeof(struct sunxi_idma_des);
+ 	mmc->max_seg_size	= (1 << host->cfg->idma_des_size_bits);
+ 	mmc->max_req_size	= mmc->max_seg_size * mmc->max_segs;
+ 	/* 400kHz ~ 52MHz */
+ 	mmc->f_min		=   400000;
+ 	mmc->f_max		= 52000000;
+ 	mmc->caps	       |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+-				  MMC_CAP_SDIO_IRQ;
++				  MMC_CAP_SDIO_IRQ | MMC_CAP_WAIT_WHILE_BUSY;
+ 
+ 	/*
+ 	 * Some H5 devices do not have signal traces precise enough to
