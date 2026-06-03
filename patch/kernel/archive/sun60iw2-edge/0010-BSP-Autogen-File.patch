@@ -1,4 +1,4 @@
 --- /dev/null
 +++ b/bsp/include/sunxi-autogen.h
 @@ -0,0 +1 @@
-+#define AW_BSP_VERSION "54e9e5fb62, 2026-05-25 15:25:04, RadxaOS SDK"
++#define AW_BSP_VERSION "a61f182e9a, 2026-06-03 17:39:22, RadxaOS SDK"

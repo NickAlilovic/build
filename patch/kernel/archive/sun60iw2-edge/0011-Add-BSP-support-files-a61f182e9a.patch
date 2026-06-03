@@ -1,12 +1,12 @@
-From 399995778a03e0b4088085140def78e3789db25b Mon Sep 17 00:00:00 2001
+From 5adfb1994a44aa4b9f7fdfa0121bab134fb9c23b Mon Sep 17 00:00:00 2001
 From: Armbian Builder <support@armbian.com>
-Date: Mon, 25 May 2026 15:25:05 +0000
-Subject: [PATCH] Add BSP support files 54e9e5fb62
+Date: Wed, 3 Jun 2026 17:39:22 +0000
+Subject: [PATCH] Add BSP support files a61f182e9a
 
 ---
  Makefile                                      |    4 +
  .../boot/dts/allwinner/sun60iw2p1-cpu-vf.dtsi | 2176 +++++++
- arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi | 5000 +++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi | 5008 +++++++++++++++++
  include/dt-bindings/clock/sun20iw5-aon-ccu.h  |   43 +
  include/dt-bindings/clock/sun20iw5-app-ccu.h  |  110 +
  include/dt-bindings/clock/sun50i-a100-ccu.h   |    3 +-
@@ -95,7 +95,7 @@ Subject: [PATCH] Add BSP support files 54e9e5fb62
  include/dt-bindings/reset/sun8iw21-ccu.h      |   60 +
  include/dt-bindings/reset/sun8iw21-r-ccu.h    |   14 +
  include/dt-bindings/spi/sunxi-spi.h           |   18 +
- 91 files changed, 12426 insertions(+), 4 deletions(-)
+ 91 files changed, 12434 insertions(+), 4 deletions(-)
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60iw2p1-cpu-vf.dtsi
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi
  create mode 100644 include/dt-bindings/clock/sun20iw5-aon-ccu.h
@@ -2382,10 +2382,10 @@ index 000000000000..023105b45da1
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi b/arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi
 new file mode 100644
-index 000000000000..9afdd383b925
+index 000000000000..2809668c8639
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi
-@@ -0,0 +1,5000 @@
+@@ -0,0 +1,5008 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +#include <dt-bindings/clock/sun60iw2-ccu.h>
 +#include <dt-bindings/clock/sun60iw2-rtc.h>
@@ -2425,7 +2425,6 @@ index 000000000000..9afdd383b925
 +		spi3 = &spi3;
 +		spi4 = &spi4;
 +		spi5 = &r_spi;
-+		gpadc0 = &gpadc0;
 +		ir0 = &irrx;
 +		ir1 = &s_irrx;
 +		ir2 = &irtx;
@@ -3318,6 +3317,13 @@ index 000000000000..9afdd383b925
 +			interrupt-controller;
 +			#interrupt-cells = <3>;
 +
++			/omit-if-no-ref/
++			ledc_pe_pin: ledc-pe-pin {
++				pins = "PE4";
++				function = "ledc";
++				drive-strength = <10>;
++			};
++
 +			sdc0_pins_f: sdc0@5 {
 +				pins = "PF2";
 +				function = "sdc0";
@@ -3705,9 +3711,10 @@ index 000000000000..9afdd383b925
 +		};
 +
 +		wdt: watchdog@2050000 {
-+			compatible = "allwinner,wdt-v103";
++			compatible = "allwinner,sun55i-a523-wdt";
 +			reg = <0x0 0x02050000 0x0 0x20>;
 +			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
++			status = "okay";
 +		};
 +
 +		dma: dma-controller@4601000 {
@@ -4553,13 +4560,14 @@ index 000000000000..9afdd383b925
 +			status = "disabled";
 +		};
 +
-+		gpadc0: gpadc@2521000 {
-+			compatible = "allwinner,sunxi-gpadc-v101";
++		gpadc: adc@2521000 {
++			compatible = "allwinner,sun55i-a523-gpadc";
 +			reg = <0x0 0x02521000 0x0 0x400>;
-+			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&ccu CLK_GPADC0>, <&ccu CLK_GPADC0_24M>;
 +			clock-names = "bus", "hosc";
 +			resets = <&ccu RST_BUS_GPADC0>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++			#io-channel-cells = <1>;
 +			status = "disabled";
 +		};
 +
@@ -4593,18 +4601,18 @@ index 000000000000..9afdd383b925
 +			status = "disabled";
 +		};
 +
-+		ledc: ledc@2520000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "allwinner,sunxi-leds";
++		ledc: led-controller@2520000 {
++			compatible = "allwinner,sun55i-a523-ledc",
++				     "allwinner,sun50i-a100-ledc";
 +			reg = <0x0 0x02520000 0x0 0x400>;
 +			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_LEDC>, <&ccu CLK_BUS_LEDC>;
-+			clock-names = "clk_ledc", "clk_cpuapb";
++			clocks = <&ccu CLK_BUS_LEDC>, <&ccu CLK_LEDC>;
++			clock-names = "bus", "mod";
 +			resets = <&ccu RST_BUS_LEDC>;
-+			reset-names = "ledc_reset";
 +			dmas = <&dma 46>;
 +			dma-names = "tx";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +			status = "disabled";
 +		};
 +

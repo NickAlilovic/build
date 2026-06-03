@@ -1,0 +1,112 @@
+From: Michal Piekos <michal.piekos@mmpsystems.pl>
+Date: Sat, 16 May 2026 07:34:14 +0200
+Subject: [PATCH v3 1/3] dt-bindings: iio: adc: Add GPADC for Allwinner A523 Precedence: bulk
+
+Add support for the GPADC for the Allwinner A523. It differs from the
+D1/T113s/R329/T507 by having two clocks.
+
+Acked-by: Conor Dooley <conor.dooley@microchip.com>
+Signed-off-by: Michal Piekos <michal.piekos@mmpsystems.pl>
+---
+ .../iio/adc/allwinner,sun20i-d1-gpadc.yaml         | 32 +++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/iio/adc/allwinner,sun20i-d1-gpadc.yaml b/Documentation/devicetree/bindings/iio/adc/allwinner,sun20i-d1-gpadc.yaml
+index da605a051b94..6467800d30e2 100644
+--- a/Documentation/devicetree/bindings/iio/adc/allwinner,sun20i-d1-gpadc.yaml
++++ b/Documentation/devicetree/bindings/iio/adc/allwinner,sun20i-d1-gpadc.yaml
+@@ -14,6 +14,7 @@ properties:
+     oneOf:
+       - enum:
+           - allwinner,sun20i-d1-gpadc
++          - allwinner,sun55i-a523-gpadc
+       - items:
+           - enum:
+               - allwinner,sun50i-h616-gpadc
+@@ -29,7 +30,12 @@ properties:
+     const: 0
+ 
+   clocks:
+-    maxItems: 1
++    minItems: 1
++    maxItems: 2
++
++  clock-names:
++    minItems: 1
++    maxItems: 2
+ 
+   interrupts:
+     maxItems: 1
+@@ -40,6 +46,30 @@ properties:
+   resets:
+     maxItems: 1
+ 
++allOf:
++  - if:
++      properties:
++        compatible:
++          enum:
++            - allwinner,sun55i-a523-gpadc
++    then:
++      properties:
++        clocks:
++          items:
++            - description: Bus clock
++            - description: Module clock
++        clock-names:
++          items:
++            - const: bus
++            - const: mod
++      required:
++        - clock-names
++    else:
++      properties:
++        clocks:
++          maxItems: 1
++        clock-names: false
++
+ patternProperties:
+   "^channel@[0-9a-f]+$":
+     $ref: adc.yaml
+
+diff --git a/drivers/iio/adc/sun20i-gpadc-iio.c b/drivers/iio/adc/sun20i-gpadc-iio.c
+index 861c14da75ad..f5fd2240b808 100644
+--- a/drivers/iio/adc/sun20i-gpadc-iio.c
++++ b/drivers/iio/adc/sun20i-gpadc-iio.c
+@@ -177,10 +177,10 @@ static int sun20i_gpadc_alloc_channels(struct iio_dev *indio_dev,
+ static int sun20i_gpadc_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+-	struct iio_dev *indio_dev;
+ 	struct sun20i_gpadc_iio *info;
++	struct clk_bulk_data *clks;
+ 	struct reset_control *rst;
+-	struct clk *clk;
++	struct iio_dev *indio_dev;
+ 	int irq;
+ 	int ret;
+ 
+@@ -205,9 +205,11 @@ static int sun20i_gpadc_probe(struct platform_device *pdev)
+ 	if (IS_ERR(info->regs))
+ 		return PTR_ERR(info->regs);
+ 
+-	clk = devm_clk_get_enabled(dev, NULL);
+-	if (IS_ERR(clk))
+-		return dev_err_probe(dev, PTR_ERR(clk), "failed to enable bus clock\n");
++	ret = devm_clk_bulk_get_all_enabled(dev, &clks);
++	if (ret < 0)
++		return dev_err_probe(dev, ret, "failed to enable clocks\n");
++	if (ret == 0)
++		return dev_err_probe(dev, -ENODEV, "needs at least one clocks\n");
+ 
+ 	rst = devm_reset_control_get_exclusive(dev, NULL);
+ 	if (IS_ERR(rst))
+@@ -243,6 +245,7 @@ static int sun20i_gpadc_probe(struct platform_device *pdev)
+ 
+ static const struct of_device_id sun20i_gpadc_of_id[] = {
+ 	{ .compatible = "allwinner,sun20i-d1-gpadc" },
++	{ .compatible = "allwinner,sun55i-a523-gpadc" },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun20i_gpadc_of_id);
+
