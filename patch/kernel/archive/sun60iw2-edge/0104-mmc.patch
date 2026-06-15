@@ -11,7 +11,7 @@ index c94ae4794545..7e243de550af 100644
  	  This selects support for the SD/MMC Host Controller on
  	  Allwinner sunxi SoCs.
 diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 8dbcff53a631..7493cfce5ae8 100644
+index 8dbcff53a631..36c38597a070 100644
 --- a/drivers/mmc/host/sunxi-mmc.c
 +++ b/drivers/mmc/host/sunxi-mmc.c
 @@ -36,6 +36,8 @@
@@ -210,7 +210,7 @@ index 8dbcff53a631..7493cfce5ae8 100644
 -	host->sg_cpu = dma_alloc_coherent(&pdev->dev, PAGE_SIZE,
 +	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
 +	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-+	host->sg_cpu = dma_alloc_coherent(&pdev->dev, PAGE_SIZE * 4,
++	host->sg_cpu = dma_alloc_coherent(&pdev->dev, PAGE_SIZE * 2,
  					  &host->sg_dma, GFP_KERNEL);
  	if (!host->sg_cpu)
  		return dev_err_probe(&pdev->dev, -ENOMEM,
@@ -234,7 +234,7 @@ index 8dbcff53a631..7493cfce5ae8 100644
  	mmc->max_blk_count	= 8192;
  	mmc->max_blk_size	= 4096;
 -	mmc->max_segs		= PAGE_SIZE / sizeof(struct sunxi_idma_des);
-+	mmc->max_segs		= PAGE_SIZE * 4 / sizeof(struct sunxi_idma_des);
++	mmc->max_segs		= PAGE_SIZE * 2 / sizeof(struct sunxi_idma_des);
  	mmc->max_seg_size	= (1 << host->cfg->idma_des_size_bits);
  	mmc->max_req_size	= mmc->max_seg_size * mmc->max_segs;
  	/* 400kHz ~ 52MHz */
@@ -246,3 +246,21 @@ index 8dbcff53a631..7493cfce5ae8 100644
  
  	/*
  	 * Some H5 devices do not have signal traces precise enough to
+@@ -1477,7 +1569,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ error_free_dma:
+-	dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
++	dma_free_coherent(&pdev->dev, PAGE_SIZE * 2, host->sg_cpu, host->sg_dma);
+ 	return ret;
+ }
+ 
+@@ -1492,7 +1584,7 @@ static void sunxi_mmc_remove(struct platform_device *pdev)
+ 		disable_irq(host->irq);
+ 		sunxi_mmc_disable(host);
+ 	}
+-	dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
++	dma_free_coherent(&pdev->dev, PAGE_SIZE * 2, host->sg_cpu, host->sg_dma);
+ }
+ 
+ static int sunxi_mmc_runtime_resume(struct device *dev)
