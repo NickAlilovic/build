@@ -1,15 +1,15 @@
-From a30ac9f14b6d16baaa41f34d6cef02c67684c723 Mon Sep 17 00:00:00 2001
+From 7f32c1ad58059981bc5533922acec7df64a8f507 Mon Sep 17 00:00:00 2001
 From: Armbian Builder <support@armbian.com>
-Date: Wed, 3 Jun 2026 17:39:23 +0000
-Subject: [PATCH] Add Allwinner Device a733 a61f182e9a
+Date: Mon, 15 Jun 2026 13:40:32 +0000
+Subject: [PATCH] Add Allwinner Device a733 a9eaa51dac
 
 ---
  .../dts/allwinner/sun60i-a733-cubie-a7a.dts   | 2079 +++++++
- .../dts/allwinner/sun60i-a733-cubie-a7s.dts   | 1564 +++++
- .../dts/allwinner/sun60i-a733-cubie-a7z.dts   | 1527 +++++
+ .../dts/allwinner/sun60i-a733-cubie-a7s.dts   | 1546 +++++
+ .../dts/allwinner/sun60i-a733-cubie-a7z.dts   | 1509 +++++
  .../boot/dts/allwinner/sun60iw2p1-cpu-vf.dtsi | 2176 +++++++
  arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi | 5008 +++++++++++++++++
- 5 files changed, 12354 insertions(+)
+ 5 files changed, 12318 insertions(+)
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
@@ -2103,10 +2103,10 @@ index 000000000000..d34cdeb343cc
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
 new file mode 100644
-index 000000000000..c751c28c5665
+index 000000000000..e008b68e260c
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
-@@ -0,0 +1,1564 @@
+@@ -0,0 +1,1546 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +
 +/dts-v1/;
@@ -3532,24 +3532,6 @@ index 000000000000..c751c28c5665
 +	extcon = <&serdes>;
 +
 +	status = "okay";
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		edp_in: port@0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+			edp0_in_tcon4: endpoint@0 {
-+				reg = <0>;
-+				remote-endpoint = <&tcon4_out_edp0>;
-+			};
-+		};
-+		edp_out: port@1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+		};
-+	};
 +};
 +
 +&cpu0 {
@@ -3673,10 +3655,10 @@ index 000000000000..c751c28c5665
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
 new file mode 100644
-index 000000000000..32b9bbcd9ef0
+index 000000000000..50e14b484a54
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
-@@ -0,0 +1,1527 @@
+@@ -0,0 +1,1509 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +
 +/dts-v1/;
@@ -5063,24 +5045,6 @@ index 000000000000..32b9bbcd9ef0
 +	extcon = <&serdes>;
 +
 +	status = "okay";
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		edp_in: port@0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+			edp0_in_tcon4: endpoint@0 {
-+				reg = <0>;
-+				remote-endpoint = <&tcon4_out_edp0>;
-+			};
-+		};
-+		edp_out: port@1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+		};
-+	};
 +};
 +
 +&cpu0 {
@@ -5204,7 +5168,6 @@ index 000000000000..32b9bbcd9ef0
 +	sid-supply = <&reg_dldo1>;
 +	voltage = <1800>;
 +};
-\ No newline at end of file
 diff --git a/arch/arm64/boot/dts/allwinner/sun60iw2p1-cpu-vf.dtsi b/arch/arm64/boot/dts/allwinner/sun60iw2p1-cpu-vf.dtsi
 new file mode 100644
 index 000000000000..023105b45da1
