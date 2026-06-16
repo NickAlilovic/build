@@ -1,15 +1,15 @@
-From 7f32c1ad58059981bc5533922acec7df64a8f507 Mon Sep 17 00:00:00 2001
+From 3270c5279cf1cb5cd7c9896d1cc362fb1fdea98e Mon Sep 17 00:00:00 2001
 From: Armbian Builder <support@armbian.com>
-Date: Mon, 15 Jun 2026 13:40:32 +0000
-Subject: [PATCH] Add Allwinner Device a733 a9eaa51dac
+Date: Tue, 16 Jun 2026 13:08:00 +0000
+Subject: [PATCH] Add Allwinner Device a733 21f9340de7
 
 ---
- .../dts/allwinner/sun60i-a733-cubie-a7a.dts   | 2079 +++++++
- .../dts/allwinner/sun60i-a733-cubie-a7s.dts   | 1546 +++++
- .../dts/allwinner/sun60i-a733-cubie-a7z.dts   | 1509 +++++
+ .../dts/allwinner/sun60i-a733-cubie-a7a.dts   | 2092 +++++++
+ .../dts/allwinner/sun60i-a733-cubie-a7s.dts   | 1537 +++++
+ .../dts/allwinner/sun60i-a733-cubie-a7z.dts   | 1487 +++++
  .../boot/dts/allwinner/sun60iw2p1-cpu-vf.dtsi | 2176 +++++++
- arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi | 5008 +++++++++++++++++
- 5 files changed, 12318 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi | 5002 +++++++++++++++++
+ 5 files changed, 12294 insertions(+)
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
@@ -18,10 +18,10 @@ Subject: [PATCH] Add Allwinner Device a733 a9eaa51dac
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
 new file mode 100644
-index 000000000000..d34cdeb343cc
+index 000000000000..e6f648827843
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
-@@ -0,0 +1,2079 @@
+@@ -0,0 +1,2092 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +
 +/dts-v1/;
@@ -646,14 +646,6 @@ index 000000000000..d34cdeb343cc
 +	};
 +};
 +
-+&soc {
-+	auto_print@54321 {
-+		reg = <0x0 0x54321 0x0 0x0>;
-+		device_type = "auto_print";
-+		status = "okay";
-+	};
-+};
-+
 +&msgbox {
 +	status = "disabled";
 +};
@@ -750,34 +742,55 @@ index 000000000000..d34cdeb343cc
 +	status = "disabled";
 +};
 +
-+&cpul_thermal_zone {
-+	cooling-maps {
-+		map0 {
-+			trip = <&cpul_target>;
-+			cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+			contribution = <1024>;
-+		};
++&ddr_trips {
++	fan_step0: trip-point@0 {
++		temperature = <40000>;
++		hysteresis = <2000>;
++		type = "active";
++	};
 +
-+		map1 {
-+			trip = <&cpul_threshold>;
-+			cooling-device = <&fan0 2 THERMAL_NO_LIMIT>;
-+			contribution = <1024>;
-+		};
++	fan_step1: trip-point@1 {
++		temperature = <45000>;
++		hysteresis = <2000>;
++		type = "active";
++	};
++
++	fan_step2: trip-point@2 {
++		temperature = <50000>;
++		hysteresis = <2000>;
++		type = "active";
++	};
++
++	fan_step3: trip-point@3 {
++		temperature = <55000>;
++		hysteresis = <5000>;
++		type = "active";
 +	};
 +};
 +
-+&cpub_thermal_zone {
++&ddr_thermal_zone {
++	polling-delay-passive = <100>;
++	polling-delay = <1000>;
++
 +	cooling-maps {
 +		map0 {
-+			trip = <&cpub_target>;
-+			cooling-device = <&cpu6 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+			contribution = <1024>;
++			trip = <&fan_step0>;
++			cooling-device = <&fan0 0 1>;
 +		};
 +
 +		map1 {
-+			trip = <&cpub_threshold>;
-+			cooling-device = <&fan0 2 THERMAL_NO_LIMIT>;
-+			contribution = <1024>;
++			trip = <&fan_step1>;
++			cooling-device = <&fan0 1 2>;
++		};
++
++		map2 {
++			trip = <&fan_step2>;
++			cooling-device = <&fan0 2 3>;
++		};
++
++		map3 {
++			trip = <&fan_step3>;
++			cooling-device = <&fan0 3 4>;
 +		};
 +	};
 +};
@@ -2103,10 +2116,10 @@ index 000000000000..d34cdeb343cc
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
 new file mode 100644
-index 000000000000..e008b68e260c
+index 000000000000..453ee4176264
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
-@@ -0,0 +1,1546 @@
+@@ -0,0 +1,1537 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +
 +/dts-v1/;
@@ -2739,14 +2752,6 @@ index 000000000000..e008b68e260c
 +	};
 +};
 +
-+&soc {
-+	auto_print@54321 {
-+		reg = <0x0 0x54321 0x0 0x0>;
-+		device_type = "auto_print";
-+		status = "okay";
-+	};
-+};
-+
 +&uart0 {
 +	// pinctrl-names = "default", "sleep";
 +	// pinctrl-0 = <&uart0_pins_active>;
@@ -2824,56 +2829,55 @@ index 000000000000..e008b68e260c
 +	status = "okay";
 +};
 +
-+&cpul_target {
-+	temperature = <60000>;
-+	hysteresis = <2000>;
-+};
++&ddr_trips {
++	fan_step0: trip-point@0 {
++		temperature = <40000>;
++		hysteresis = <2000>;
++		type = "active";
++	};
 +
-+&cpul_threshold{
-+	type = "active";
-+	temperature = <60000>;
-+	hysteresis = <2000>;
-+};
++	fan_step1: trip-point@1 {
++		temperature = <45000>;
++		hysteresis = <2000>;
++		type = "active";
++	};
 +
-+&cpul_thermal_zone {
-+	cooling-maps {
-+		map0 {
-+			trip = <&cpul_target>;
-+			cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+			contribution = <1024>;
-+		};
++	fan_step2: trip-point@2 {
++		temperature = <50000>;
++		hysteresis = <2000>;
++		type = "active";
++	};
 +
-+		map1 {
-+			trip = <&cpul_threshold>;
-+			cooling-device = <&fan0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+			contribution = <1024>;
-+		};
++	fan_step3: trip-point@3 {
++		temperature = <55000>;
++		hysteresis = <5000>;
++		type = "active";
 +	};
 +};
 +
-+&cpub_target {
-+	temperature = <60000>;
-+	hysteresis = <2000>;
-+};
++&ddr_thermal_zone {
++	polling-delay-passive = <100>;
++	polling-delay = <1000>;
 +
-+&cpub_threshold{
-+	type = "active";
-+	temperature = <60000>;
-+	hysteresis = <2000>;
-+};
-+
-+&cpub_thermal_zone {
 +	cooling-maps {
 +		map0 {
-+			trip = <&cpub_target>;
-+			cooling-device = <&cpu6 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+			contribution = <1024>;
++			trip = <&fan_step0>;
++			cooling-device = <&fan0 0 1>;
 +		};
 +
 +		map1 {
-+			trip = <&cpub_threshold>;
-+			cooling-device = <&fan0 2 THERMAL_NO_LIMIT>;
-+			contribution = <1024>;
++			trip = <&fan_step1>;
++			cooling-device = <&fan0 1 2>;
++		};
++
++		map2 {
++			trip = <&fan_step2>;
++			cooling-device = <&fan0 2 3>;
++		};
++
++		map3 {
++			trip = <&fan_step3>;
++			cooling-device = <&fan0 3 4>;
 +		};
 +	};
 +};
@@ -3655,10 +3659,10 @@ index 000000000000..e008b68e260c
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
 new file mode 100644
-index 000000000000..50e14b484a54
+index 000000000000..95e04c411af3
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
-@@ -0,0 +1,1509 @@
+@@ -0,0 +1,1487 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +
 +/dts-v1/;
@@ -3711,6 +3715,14 @@ index 000000000000..50e14b484a54
 +			gpios = <&r_pio PM 2 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "heartbeat";
 +		};
++	};
++
++	fan0: pwm-fan {
++		compatible = "pwm-fan";
++		#cooling-cells = <2>;
++		cooling-levels = <1 50 102 170 255>;
++		fan-supply = <&reg_dc1sw1>;
++		pwms = <&pwm1 9 25000 0>;
 +	};
 +
 +	phy_switcher: phy_switcher@10 {
@@ -4243,16 +4255,6 @@ index 000000000000..50e14b484a54
 +	};
 +};
 +
-+&soc {
-+	fan0: pwm-fan {
-+		compatible = "pwm-fan";
-+		#cooling-cells = <2>;
-+		cooling-levels = <0 50 102 170 255>;
-+		fan-supply = <&reg_dc1sw1>;
-+		pwms = <&pwm1 9 25000 0>;
-+	};
-+};
-+
 +&uart0 {
 +	// pinctrl-names = "default", "sleep";
 +	// pinctrl-0 = <&uart0_pins_active>;
@@ -4337,65 +4339,55 @@ index 000000000000..50e14b484a54
 +	status = "okay";
 +};
 +
-+&cpul_thres {
-+	temperature = <70000>;
++&ddr_trips {
++	fan_step0: trip-point@0 {
++		temperature = <40000>;
++		hysteresis = <2000>;
++		type = "active";
++	};
++
++	fan_step1: trip-point@1 {
++		temperature = <45000>;
++		hysteresis = <2000>;
++		type = "active";
++	};
++
++	fan_step2: trip-point@2 {
++		temperature = <50000>;
++		hysteresis = <2000>;
++		type = "active";
++	};
++
++	fan_step3: trip-point@3 {
++		temperature = <55000>;
++		hysteresis = <5000>;
++		type = "active";
++	};
 +};
 +
-+&cpul_overshot {
-+	temperature = <90000>;
-+};
++&ddr_thermal_zone {
++	polling-delay-passive = <100>;
++	polling-delay = <1000>;
 +
-+&cpul_idle_zone {
 +	cooling-maps {
 +		map0 {
-+			cooling-device = <&cpu2_idle 0 100>,
-+						<&cpu3_idle 0 100>,
-+						<&cpu4_idle 0 100>,
-+						<&cpu5_idle 0 100>;
++			trip = <&fan_step0>;
++			cooling-device = <&fan0 0 1>;
 +		};
-+	};
-+};
 +
-+&cpul_target {
-+	temperature = <60000>;
-+	hysteresis = <2000>;
-+};
-+
-+&cpul_threshold{
-+	type = "active";
-+	temperature = <60000>;
-+	hysteresis = <2000>;
-+};
-+
-+&cpul_thermal_zone {
-+	sustainable-power = <3000>;
-+	cooling-maps {
 +		map1 {
-+			trip = <&cpul_threshold>;
-+			cooling-device = <&fan0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+			contribution = <1024>;
++			trip = <&fan_step1>;
++			cooling-device = <&fan0 1 2>;
 +		};
-+	};
-+};
 +
-+&cpub_target {
-+	temperature = <60000>;
-+    hysteresis = <2000>;
-+};
++		map2 {
++			trip = <&fan_step2>;
++			cooling-device = <&fan0 2 3>;
++		};
 +
-+&cpub_threshold {
-+    type = "active";
-+    temperature = <60000>;
-+    hysteresis = <2000>;
-+};
-+
-+&cpub_thermal_zone {
-+	sustainable-power = <4000>;
-+	cooling-maps {
-+		map1 {
-+			trip = <&cpub_threshold>;
-+			cooling-device = <&fan0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+			contribution = <1024>;
++		map3 {
++			trip = <&fan_step3>;
++			cooling-device = <&fan0 3 4>;
 +		};
 +	};
 +};
@@ -5135,16 +5127,6 @@ index 000000000000..50e14b484a54
 +	key4 = <880 172>;
 +	status = "okay";
 +};
-+
-+// &gpadc {
-+// 	#address-cells = <1>;
-+// 	#size-cells = <0>;
-+// 	status = "okay";
-+
-+// 	channel@0 {
-+// 		reg = <0>;
-+// 	};
-+// };
 +
 +// &gpadc0 {
 +// 	channel_num = <8>;
@@ -7352,10 +7334,10 @@ index 000000000000..023105b45da1
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi b/arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi
 new file mode 100644
-index 000000000000..2809668c8639
+index 000000000000..b60f4eeed04e
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi
-@@ -0,0 +1,5008 @@
+@@ -0,0 +1,5002 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +#include <dt-bindings/clock/sun60iw2-ccu.h>
 +#include <dt-bindings/clock/sun60iw2-rtc.h>
@@ -8002,23 +7984,17 @@ index 000000000000..2809668c8639
 +			cooling-maps {
 +				map0 {
 +					trip = <&gpu_threshold>;
-+					cooling-device = <&gpu
-+					0
-+					0>;
++					cooling-device = <&gpu 0 0>;
 +					contribution = <1024>;
 +				};
 +				map1 {
 +					trip = <&gpu_target>;
-+					cooling-device = <&gpu
-+					0
-+					3>;
++					cooling-device = <&gpu 0 3>;
 +					contribution = <1024>;
 +				};
 +				map2 {
 +					trip = <&gpu_crit>;
-+					cooling-device = <&gpu
-+					3
-+					3>;
++					cooling-device = <&gpu 3 3>;
 +					contribution = <1024>;
 +				};
 +

@@ -1,12 +1,12 @@
-From 92e48457ec7e946e9922109f5055d3ad6276f623 Mon Sep 17 00:00:00 2001
+From 781a534c376584d35be5c5dcf58f4f1bc3318788 Mon Sep 17 00:00:00 2001
 From: Armbian Builder <support@armbian.com>
-Date: Mon, 15 Jun 2026 13:40:30 +0000
-Subject: [PATCH] Add BSP support files a9eaa51dac
+Date: Tue, 16 Jun 2026 13:07:59 +0000
+Subject: [PATCH] Add BSP support files 21f9340de7
 
 ---
  Makefile                                      |    4 +
  .../boot/dts/allwinner/sun60iw2p1-cpu-vf.dtsi | 2176 +++++++
- arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi | 5008 +++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi | 5002 +++++++++++++++++
  include/dt-bindings/clock/sun20iw5-aon-ccu.h  |   43 +
  include/dt-bindings/clock/sun20iw5-app-ccu.h  |  110 +
  include/dt-bindings/clock/sun50i-a100-ccu.h   |    3 +-
@@ -95,7 +95,7 @@ Subject: [PATCH] Add BSP support files a9eaa51dac
  include/dt-bindings/reset/sun8iw21-ccu.h      |   60 +
  include/dt-bindings/reset/sun8iw21-r-ccu.h    |   14 +
  include/dt-bindings/spi/sunxi-spi.h           |   18 +
- 91 files changed, 12434 insertions(+), 4 deletions(-)
+ 91 files changed, 12428 insertions(+), 4 deletions(-)
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60iw2p1-cpu-vf.dtsi
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi
  create mode 100644 include/dt-bindings/clock/sun20iw5-aon-ccu.h
@@ -2382,10 +2382,10 @@ index 000000000000..023105b45da1
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi b/arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi
 new file mode 100644
-index 000000000000..2809668c8639
+index 000000000000..b60f4eeed04e
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60iw2p1.dtsi
-@@ -0,0 +1,5008 @@
+@@ -0,0 +1,5002 @@
 +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
 +#include <dt-bindings/clock/sun60iw2-ccu.h>
 +#include <dt-bindings/clock/sun60iw2-rtc.h>
@@ -3032,23 +3032,17 @@ index 000000000000..2809668c8639
 +			cooling-maps {
 +				map0 {
 +					trip = <&gpu_threshold>;
-+					cooling-device = <&gpu
-+					0
-+					0>;
++					cooling-device = <&gpu 0 0>;
 +					contribution = <1024>;
 +				};
 +				map1 {
 +					trip = <&gpu_target>;
-+					cooling-device = <&gpu
-+					0
-+					3>;
++					cooling-device = <&gpu 0 3>;
 +					contribution = <1024>;
 +				};
 +				map2 {
 +					trip = <&gpu_crit>;
-+					cooling-device = <&gpu
-+					3
-+					3>;
++					cooling-device = <&gpu 3 3>;
 +					contribution = <1024>;
 +				};
 +
