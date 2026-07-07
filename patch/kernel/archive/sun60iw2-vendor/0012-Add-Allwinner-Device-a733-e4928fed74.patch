@@ -1,14 +1,14 @@
-From e9171c82bc88d217f792884ac003fa5ab15ad1e1 Mon Sep 17 00:00:00 2001
+From b00bf41a919875c7c683ed2c6bf5de3a78faf632 Mon Sep 17 00:00:00 2001
 From: Armbian Builder <support@armbian.com>
-Date: Tue, 28 Apr 2026 18:29:41 +0000
-Subject: [PATCH] Add Allwinner Device a733 95029ad978
+Date: Tue, 7 Jul 2026 14:29:18 +0000
+Subject: [PATCH] Add Allwinner Device a733 e4928fed74
 
 ---
  .../dts/allwinner/sun60i-a733-cubie-a7a.dts   | 2427 +++++++++++++++++
  .../dts/allwinner/sun60i-a733-cubie-a7s.dts   | 2158 +++++++++++++++
  .../dts/allwinner/sun60i-a733-cubie-a7z.dts   | 2182 +++++++++++++++
- arch/arm64/configs/bsp.config                 |  389 +++
- 4 files changed, 7156 insertions(+)
+ arch/arm64/configs/bsp.config                 |  392 +++
+ 4 files changed, 7159 insertions(+)
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
  create mode 100755 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
@@ -16,7 +16,7 @@ Subject: [PATCH] Add Allwinner Device a733 95029ad978
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
 new file mode 100644
-index 000000000000..88d8a8ed3e7d
+index 000000000000..162387fd7de9
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
 @@ -0,0 +1,2427 @@
@@ -28,7 +28,7 @@ index 000000000000..88d8a8ed3e7d
 +#define TYPEC_DP 1
 +/{
 +	board = "A733", "A733-CUBIE-A7A-AXP318";
-+	compatible = "radxa,cubie-a7a", "arm,sun60iw2p1";
++	compatible = "radxa,a733", "radxa,cubie-a7a", "arm,sun60iw2p1", "allwinner,sun60i-a733";
 +	aliases {
 +		arisc-config = &arisc_config;
 +		pmu0 = &pmu0;
@@ -2449,7 +2449,7 @@ index 000000000000..88d8a8ed3e7d
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
 new file mode 100755
-index 000000000000..f7c1a88929d4
+index 000000000000..4bf0a5349c0e
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
 @@ -0,0 +1,2158 @@
@@ -2461,7 +2461,7 @@ index 000000000000..f7c1a88929d4
 +#define TYPEC_DP 1
 +/{
 +	board = "A733", "A733-CUBIE-A7S-AXP318";
-+	compatible = "radxa,cubie-a7s", "arm,sun60iw2p1", "allwinner,sun60i-a733";
++	compatible = "radxa,a733", "radxa,cubie-a7s", "arm,sun60iw2p1", "allwinner,sun60i-a733";
 +	aliases {
 +		arisc-config = &arisc_config;
 +		pmu0 = &pmu0;
@@ -4613,7 +4613,7 @@ index 000000000000..f7c1a88929d4
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
 new file mode 100644
-index 000000000000..df117c21696b
+index 000000000000..67d2976f8f95
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
 @@ -0,0 +1,2182 @@
@@ -4625,7 +4625,7 @@ index 000000000000..df117c21696b
 +#define TYPEC_DP 1
 +/{
 +	board = "A733", "A733-CUBIE-A7Z-AXP318";
-+	compatible = "radxa,cubie-a7z", "arm,sun60iw2p1";
++	compatible = "radxa,a733", "radxa,cubie-a7z", "arm,sun60iw2p1", "allwinner,sun60i-a733";
 +	aliases {
 +		standby_param = &standby_param;
 +		arisc-config = &arisc_config;
@@ -6801,10 +6801,10 @@ index 000000000000..df117c21696b
 +};
 diff --git a/arch/arm64/configs/bsp.config b/arch/arm64/configs/bsp.config
 new file mode 100644
-index 000000000000..6726ccdfc615
+index 000000000000..db4ae46d71d3
 --- /dev/null
 +++ b/arch/arm64/configs/bsp.config
-@@ -0,0 +1,389 @@
+@@ -0,0 +1,392 @@
 +# CONFIG_LOCALVERSION_AUTO is not set
 +CONFIG_SYSVIPC=y
 +CONFIG_NO_HZ=y
@@ -6867,7 +6867,9 @@ index 000000000000..6726ccdfc615
 +CONFIG_AW_MMC=y
 +CONFIG_AW_UFS=y
 +CONFIG_AW_MTD=y
-+CONFIG_AW_MTD_SUNXI_PARTS=y
++CONFIG_AW_MTD_SPI_NOR_6_1=y
++CONFIG_SPIF_SUNXI=y
++# CONFIG_AW_MTD_SUNXI_PARTS is not set
 +CONFIG_AW_FB_CONSOLE=y
 +# CONFIG_AW_DISP2 is not set
 +CONFIG_AW_DI=m
@@ -7004,7 +7006,8 @@ index 000000000000..6726ccdfc615
 +CONFIG_MTD=y
 +CONFIG_MTD_OF_PARTS=m
 +CONFIG_MTD_BLOCK=y
-+CONFIG_BLK_DEV_NVME=m
++CONFIG_BLK_DEV_NVME=y
++CONFIG_NVME_CORE=y
 +CONFIG_NVME_TARGET=m
 +CONFIG_NVME_TARGET_PASSTHRU=y
 +CONFIG_NVME_TARGET_LOOP=m
