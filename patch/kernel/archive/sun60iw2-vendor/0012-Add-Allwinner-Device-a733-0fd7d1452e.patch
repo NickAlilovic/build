@@ -1,14 +1,14 @@
-From b00bf41a919875c7c683ed2c6bf5de3a78faf632 Mon Sep 17 00:00:00 2001
+From 3ae96d8b6ee767bc829ef94592c34dee2ffa8de0 Mon Sep 17 00:00:00 2001
 From: Armbian Builder <support@armbian.com>
-Date: Tue, 7 Jul 2026 14:29:18 +0000
-Subject: [PATCH] Add Allwinner Device a733 e4928fed74
+Date: Sat, 25 Jul 2026 14:40:10 +0000
+Subject: [PATCH] Add Allwinner Device a733 0fd7d1452e
 
 ---
  .../dts/allwinner/sun60i-a733-cubie-a7a.dts   | 2427 +++++++++++++++++
  .../dts/allwinner/sun60i-a733-cubie-a7s.dts   | 2158 +++++++++++++++
  .../dts/allwinner/sun60i-a733-cubie-a7z.dts   | 2182 +++++++++++++++
- arch/arm64/configs/bsp.config                 |  392 +++
- 4 files changed, 7159 insertions(+)
+ arch/arm64/configs/bsp.config                 |  394 +++
+ 4 files changed, 7161 insertions(+)
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
  create mode 100755 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
  create mode 100644 arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
@@ -4613,7 +4613,7 @@ index 000000000000..4bf0a5349c0e
 +};
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
 new file mode 100644
-index 000000000000..67d2976f8f95
+index 000000000000..7bbe88449f9e
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7z.dts
 @@ -0,0 +1,2182 @@
@@ -4696,7 +4696,7 @@ index 000000000000..67d2976f8f95
 +		compatible = "gpio-leds";
 +
 +		led-0 {
-+			label = "radxa:blue:user";
++			label = "radxa:green:user";
 +			gpios = <&r_pio PM 2 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "heartbeat";
 +		};
@@ -6338,9 +6338,9 @@ index 000000000000..67d2976f8f95
 +						>;
 +			source-pdos = < PDO_FIXED(5000, 500, (0x1<<29)|(0x1<<25))
 +							PDO_VAR(5000, 5000, 1200) >;
-+			/* fixme */
-+			sink-vdos = <0xd1002e99 0x00 0x03110000>;
-+			sink-vdos-v1 = <0xd1002e99 0x00 0x03110000>;
++			/* ET7304 identity: VID 0x6dcf, PID 0x1711 */
++			sink-vdos = <0xd1006dcf 0x00 0x17110000>;
++			sink-vdos-v1 = <0xd1006dcf 0x00 0x17110000>;
 +
 +			altmodes {
 +				#address-cells = <1>;
@@ -6801,10 +6801,10 @@ index 000000000000..67d2976f8f95
 +};
 diff --git a/arch/arm64/configs/bsp.config b/arch/arm64/configs/bsp.config
 new file mode 100644
-index 000000000000..db4ae46d71d3
+index 000000000000..f1d24427dd4a
 --- /dev/null
 +++ b/arch/arm64/configs/bsp.config
-@@ -0,0 +1,392 @@
+@@ -0,0 +1,394 @@
 +# CONFIG_LOCALVERSION_AUTO is not set
 +CONFIG_SYSVIPC=y
 +CONFIG_NO_HZ=y
@@ -7197,6 +7197,8 @@ index 000000000000..db4ae46d71d3
 +CONFIG_SND_SOC_SUNXI_CODEC_AV=y
 +CONFIG_BLK_DEV=y
 +CONFIG_BLK_DEV_LOOP=y
++CONFIG_BACKLIGHT_GPIO=m
++CONFIG_PWM_GPIO=m
 -- 
 2.47.3
 
