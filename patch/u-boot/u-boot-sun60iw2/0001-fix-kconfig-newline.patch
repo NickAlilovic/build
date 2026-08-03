@@ -1,0 +1,11 @@
+diff --git a/drivers/video/sunxi/disp2/disp/lcd/Kconfig b/drivers/video/sunxi/disp2/disp/lcd/Kconfig
+index 12bb4162d0a..7683e7f4920 100644
+--- a/drivers/video/sunxi/disp2/disp/lcd/Kconfig
++++ b/drivers/video/sunxi/disp2/disp/lcd/Kconfig
+@@ -353,4 +353,4 @@ config LCD_SUPPORT_ILI9881T_INCELL_800X1280
+ 	bool "LCD support LCD_SUPPORT_ILI9881T_INCELL_800X1280 panel"
+ 	default n
+ 	help
+-		If you want to support LCD_SUPPORT_ILI9881T_INCELL_800X1280 panel for display driver, select it.
+\ No newline at end of file
++		If you want to support LCD_SUPPORT_ILI9881T_INCELL_800X1280 panel for display driver, select it.
