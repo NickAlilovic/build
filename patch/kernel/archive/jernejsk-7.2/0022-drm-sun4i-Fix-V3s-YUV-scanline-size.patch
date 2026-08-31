@@ -1,0 +1,28 @@
+From 750ef2c186e39e4b49f985d0175ce3f97e59fa01 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 14 Mar 2026 18:00:33 +0100
+Subject: [PATCH] drm/sun4i: Fix V3s YUV scanline size
+
+According to vendor driver, proper YUV scanline is 1024.
+
+Fix it.
+
+Fixes: 2586de70c15c ("drm/sun4i: Add VI scaler line size quirk for DE2/DE3")
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index 0c8d7132ff5729..eb7ffea8336c5e 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -828,7 +828,7 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
+ 		.de_type	= SUN8I_MIXER_DE2,
+ 		.vi_scaler_num	= 2,
+ 		.scaler_mask	= 0x3,
+-		.scanline_yuv	= 2048,
++		.scanline_yuv	= 1024,
+ 	},
+ 	.de_type	= SUN8I_MIXER_DE2,
+ 	.mod_rate	= 150000000,

@@ -1,0 +1,130 @@
+From ea69731d9e4f8a471efe4c4f1f9da9d41eaf0bb1 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 18 Jul 2026 13:36:32 +0200
+Subject: [PATCH] dt-bindings: display: allwinner: Add H616 DE33 writeback
+
+H616 writeback uses the DE33 RTWB block, a dedicated RCQ register window
+and routing registers in the display clock controller. Add its compatible
+and describe the second register range and clock-controller phandle.
+
+DE33 plane fetch, RCQ and writeback traffic use one IOMMU master rather
+than independent masters per block. Put the IOMMU attachment on the
+shared planes node and disallow a separate writeback attachment for
+H616. Keep the H6 writeback IOMMU requirement unchanged.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ .../display/allwinner,sun50i-h6-de3-wb.yaml   | 43 +++++++++++++++++--
+ .../allwinner,sun50i-h616-de33-planes.yaml    |  5 +++
+ 2 files changed, 44 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/display/allwinner,sun50i-h6-de3-wb.yaml b/Documentation/devicetree/bindings/display/allwinner,sun50i-h6-de3-wb.yaml
+index 9ef330bfadbc45..d539a91887fdd8 100644
+--- a/Documentation/devicetree/bindings/display/allwinner,sun50i-h6-de3-wb.yaml
++++ b/Documentation/devicetree/bindings/display/allwinner,sun50i-h6-de3-wb.yaml
+@@ -4,17 +4,25 @@
+ $id: http://devicetree.org/schemas/display/allwinner,sun50i-h6-de3-wb.yaml#
+ $schema: http://devicetree.org/meta-schemas/core.yaml#
+ 
+-title: Allwinner DE3 Writeback Engine
++title: Allwinner DE3 and DE33 Writeback Engine
+ 
+ maintainers:
+   - Jernej Skrabec <jernej.skrabec@gmail.com>
+ 
+ properties:
+   compatible:
+-    const: allwinner,sun50i-h6-de3-wb
++    enum:
++      - allwinner,sun50i-h6-de3-wb
++      - allwinner,sun50i-h616-de33-wb
+ 
+   reg:
+-    maxItems: 1
++    minItems: 1
++    maxItems: 2
++
++  reg-names:
++    items:
++      - const: writeback
++      - const: rcq
+ 
+   clocks:
+     items:
+@@ -35,6 +43,10 @@ properties:
+   resets:
+     maxItems: 1
+ 
++  allwinner,top:
++    $ref: /schemas/types.yaml#/definitions/phandle
++    description: Phandle to the DE33 top-level clock and routing controller
++
+   ports:
+     $ref: /schemas/graph.yaml#/properties/ports
+ 
+@@ -74,11 +86,34 @@ required:
+   - reg
+   - clocks
+   - clock-names
+-  - iommus
+   - interrupts
+   - resets
+   - ports
+ 
++allOf:
++  - if:
++      properties:
++        compatible:
++          const: allwinner,sun50i-h616-de33-wb
++    then:
++      properties:
++        reg:
++          minItems: 2
++        reg-names:
++          minItems: 2
++        iommus: false
++      required:
++        - reg-names
++        - allwinner,top
++    else:
++      properties:
++        reg:
++          maxItems: 1
++        reg-names: false
++        allwinner,top: false
++      required:
++        - iommus
++
+ additionalProperties: false
+ 
+ examples:
+diff --git a/Documentation/devicetree/bindings/display/allwinner,sun50i-h616-de33-planes.yaml b/Documentation/devicetree/bindings/display/allwinner,sun50i-h616-de33-planes.yaml
+index 0a07cb8a5f7987..16121819a37ca2 100644
+--- a/Documentation/devicetree/bindings/display/allwinner,sun50i-h616-de33-planes.yaml
++++ b/Documentation/devicetree/bindings/display/allwinner,sun50i-h616-de33-planes.yaml
+@@ -22,6 +22,9 @@ properties:
+   reg:
+     maxItems: 1
+ 
++  iommus:
++    maxItems: 1
++
+   allwinner,plane-mapping:
+     $ref: /schemas/types.yaml#/definitions/phandle
+     description:
+@@ -31,6 +34,7 @@ properties:
+ required:
+   - compatible
+   - reg
++  - iommus
+   - allwinner,plane-mapping
+ 
+ additionalProperties: false
+@@ -40,6 +44,7 @@ examples:
+     planes: planes@100000 {
+         compatible = "allwinner,sun50i-h616-de33-planes";
+         reg = <0x100000 0x180000>;
++        iommus = <&iommu 0>;
+         allwinner,plane-mapping = <&display_clocks>;
+     };
+ 

@@ -1,0 +1,323 @@
+From bc00f671fc95a4caacdd3a625915e10620650d3c Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Tue, 21 Jul 2026 15:10:16 +0200
+Subject: [PATCH] media: sunxi: sun50i-di300: Move FMD stats to the Request API
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Device-global stats had no per-job identity: nothing tied a read value
+to the exact buffer that produced it, and a fast client could read
+stale or in-flight data. Rework to bind the FMD stats control to the
+Request API instead, following the same request lifecycle stateless
+codec drivers already use (setup before the job runs, complete after):
+
+- Add a struct media_device and the entity/pad graph via
+  v4l2_m2m_register_media_controller(), plus req_validate/req_queue
+  so requests are actually usable on this device.
+- OUTPUT queue gains supports_requests, buf_out_validate and
+  buf_request_complete (the latter only fires on the request-cancel
+  path, per videobuf2-core.c; it does not replace completing the
+  request on the success path).
+- device_run() calls v4l2_ctrl_request_setup() and remembers which
+  request (if any) is bound to the job's OUTPUT buffer.
+- The IRQ handler calls v4l2_ctrl_request_complete() only after
+  DEINTERLACE_FMD_* registers are latched into dev->fmd_stats, so the
+  volatile control's g_volatile_ctrl reads this job's values and not
+  a stale ones from whenever userspace happened to poll.
+
+This also directly gives the "usable without it" requirement: FMD is
+gated on both hardware capability and the job's OUTPUT buffer actually
+carrying a request (dev->has_fmd && ctx->req). A client that never
+uses the Request API never has a request bound to any job, so FMD
+hardware is never enabled for it and dev->fmd_stats never updates —
+there is no other, request-less path to reach FMD at all.
+---
+ .../sunxi/sun50i-di300/sun50i-di300.c         | 139 ++++++++++++++++--
+ .../sunxi/sun50i-di300/sun50i-di300.h         |  11 ++
+ 2 files changed, 138 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+index 5e19a93f3272a5..41ea7a43683284 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+@@ -190,6 +190,18 @@ static void deinterlace_device_run(void *priv)
+ 
+ 	src = v4l2_m2m_next_src_buf(ctx->fh.m2m_ctx);
+ 
++	/*
++	 * FMD is only meaningful to a client using the Request API: its
++	 * output is per-job telemetry, and without a request there is no
++	 * mechanism to hand it back tied to the job that produced it.
++	 * A client that never uses requests gets no FMD at all, even on
++	 * hardware that has it.
++	 */
++	ctx->req = src->vb2_buf.req_obj.req;
++	ctx->fmd_active = dev->has_fmd && ctx->req;
++	if (ctx->req)
++		v4l2_ctrl_request_setup(ctx->req, &ctx->hdl);
++
+ 	/*
+ 	 * Pick the two buffers actually at the front of the ready
+ 	 * queue. v4l2_m2m_last_dst_buf() returns the tail of the whole
+@@ -302,7 +314,7 @@ static void deinterlace_device_run(void *priv)
+ 	deinterlace_write(dev, DEINTERLACE_DIT_CROP_V, reg);
+ 	deinterlace_write(dev, DEINTERLACE_MD_CROP_V, reg);
+ 
+-	if (dev->has_fmd) {
++	if (ctx->fmd_active) {
+ 		reg = (ctx->src_fmt.width - 1) << 16;
+ 		deinterlace_write(dev, DEINTERLACE_FMD_CROP_H, reg);
+ 		reg = (ctx->src_fmt.height - 1) << 16;
+@@ -325,7 +337,7 @@ static void deinterlace_device_run(void *priv)
+ 	reg = DEINTERLACE_FUNC_EN_DIT;
+ 	if (motion)
+ 		reg |= DEINTERLACE_FUNC_EN_MD;
+-	if (dev->has_fmd)
++	if (ctx->fmd_active)
+ 		reg |= DEINTERLACE_FUNC_EN_FMD;
+ 	deinterlace_write(dev, DEINTERLACE_FUNC_EN, reg);
+ 
+@@ -389,7 +401,7 @@ static irqreturn_t deinterlace_irq(int irq, void *data)
+ 
+ 	state = ctx->aborting ? VB2_BUF_STATE_ERROR : VB2_BUF_STATE_DONE;
+ 
+-	if (dev->has_fmd) {
++	if (ctx->fmd_active) {
+ 		dev->fmd_stats[0] = deinterlace_read(dev, DEINTERLACE_FMD_FID12) &
+ 				    DEINTERLACE_FMD_HIST_CNT_MASK;
+ 		dev->fmd_stats[1] = deinterlace_read(dev, DEINTERLACE_FMD_FID23) &
+@@ -410,6 +422,16 @@ static irqreturn_t deinterlace_irq(int irq, void *data)
+ 		dev->fmd_stats[9] = deinterlace_read(dev, DEINTERLACE_FMD_FIELD_HIST1);
+ 	}
+ 
++	/*
++	 * Complete the request only after the stats above are latched, so
++	 * the volatile control's g_volatile_ctrl (invoked from within this
++	 * call) reads this job's values rather than a stale ones.
++	 */
++	if (ctx->req) {
++		v4l2_ctrl_request_complete(ctx->req, &ctx->hdl);
++		ctx->req = NULL;
++	}
++
+ 	dst0 = ctx->dst0;
+ 	dst1 = ctx->dst1;
+ 	v4l2_m2m_dst_buf_remove_by_buf(ctx->fh.m2m_ctx, dst0);
+@@ -746,6 +768,23 @@ static void deinterlace_buf_queue(struct vb2_buffer *vb)
+ 	v4l2_m2m_buf_queue(ctx->fh.m2m_ctx, vbuf);
+ }
+ 
++static int deinterlace_buf_out_validate(struct vb2_buffer *vb)
++{
++	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
++	struct deinterlace_ctx *ctx = vb2_get_drv_priv(vb->vb2_queue);
++
++	vbuf->field = ctx->src_fmt.field;
++
++	return 0;
++}
++
++static void deinterlace_buf_request_complete(struct vb2_buffer *vb)
++{
++	struct deinterlace_ctx *ctx = vb2_get_drv_priv(vb->vb2_queue);
++
++	v4l2_ctrl_request_complete(vb->req_obj.req, &ctx->hdl);
++}
++
+ static void deinterlace_queue_cleanup(struct vb2_queue *vq, u32 state)
+ {
+ 	struct deinterlace_ctx *ctx = vb2_get_drv_priv(vq);
+@@ -846,6 +885,8 @@ static const struct vb2_ops deinterlace_qops = {
+ 	.queue_setup		= deinterlace_queue_setup,
+ 	.buf_prepare		= deinterlace_buf_prepare,
+ 	.buf_queue		= deinterlace_buf_queue,
++	.buf_out_validate	= deinterlace_buf_out_validate,
++	.buf_request_complete	= deinterlace_buf_request_complete,
+ 	.start_streaming	= deinterlace_start_streaming,
+ 	.stop_streaming		= deinterlace_stop_streaming,
+ };
+@@ -866,6 +907,7 @@ static int deinterlace_queue_init(void *priv, struct vb2_queue *src_vq,
+ 	src_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
+ 	src_vq->lock = &ctx->dev->dev_mutex;
+ 	src_vq->dev = ctx->dev->dev;
++	src_vq->supports_requests = true;
+ 
+ 	ret = vb2_queue_init(src_vq);
+ 	if (ret)
+@@ -1034,6 +1076,45 @@ static const struct v4l2_m2m_ops deinterlace_m2m_ops = {
+ 	.job_abort	= deinterlace_job_abort,
+ };
+ 
++static int deinterlace_request_validate(struct media_request *req)
++{
++	struct media_request_object *obj;
++	struct deinterlace_ctx *ctx = NULL;
++	unsigned int count;
++
++	list_for_each_entry(obj, &req->objects, list) {
++		struct vb2_buffer *vb;
++
++		if (vb2_request_object_is_buffer(obj)) {
++			vb = container_of(obj, struct vb2_buffer, req_obj);
++			ctx = vb2_get_drv_priv(vb->vb2_queue);
++
++			break;
++		}
++	}
++
++	if (!ctx)
++		return -ENOENT;
++
++	count = vb2_request_buffer_cnt(req);
++	if (!count) {
++		v4l2_info(&ctx->dev->v4l2_dev,
++			  "No buffer was provided with the request\n");
++		return -ENOENT;
++	} else if (count > 1) {
++		v4l2_info(&ctx->dev->v4l2_dev,
++			  "More than one buffer was provided with the request\n");
++		return -EINVAL;
++	}
++
++	return vb2_request_validate(req);
++}
++
++static const struct media_device_ops deinterlace_media_ops = {
++	.req_validate	= deinterlace_request_validate,
++	.req_queue	= v4l2_m2m_request_queue,
++};
++
+ static int deinterlace_probe(struct platform_device *pdev)
+ {
+ 	struct deinterlace_dev *dev;
+@@ -1101,25 +1182,48 @@ static int deinterlace_probe(struct platform_device *pdev)
+ 		 deinterlace_video_device.name);
+ 	video_set_drvdata(vfd, dev);
+ 
++	dev->m2m_dev = v4l2_m2m_init(&deinterlace_m2m_ops);
++	if (IS_ERR(dev->m2m_dev)) {
++		v4l2_err(&dev->v4l2_dev,
++			 "Failed to initialize V4L2 M2M device\n");
++		ret = PTR_ERR(dev->m2m_dev);
++
++		goto err_v4l2;
++	}
++
++	dev->mdev.dev = &pdev->dev;
++	strscpy(dev->mdev.model, DEINTERLACE_NAME, sizeof(dev->mdev.model));
++	strscpy(dev->mdev.bus_info, "platform:" DEINTERLACE_NAME,
++		sizeof(dev->mdev.bus_info));
++
++	media_device_init(&dev->mdev);
++	dev->mdev.ops = &deinterlace_media_ops;
++	dev->v4l2_dev.mdev = &dev->mdev;
++
+ 	ret = video_register_device(vfd, VFL_TYPE_VIDEO, 0);
+ 	if (ret) {
+ 		v4l2_err(&dev->v4l2_dev, "Failed to register video device\n");
+ 
+-		goto err_v4l2;
++		goto err_media;
+ 	}
+ 
+ 	v4l2_info(&dev->v4l2_dev,
+ 		  "Device registered as /dev/video%d\n", vfd->num);
+ 
+-	dev->m2m_dev = v4l2_m2m_init(&deinterlace_m2m_ops);
+-	if (IS_ERR(dev->m2m_dev)) {
++	ret = v4l2_m2m_register_media_controller(dev->m2m_dev, vfd,
++						 MEDIA_ENT_F_PROC_VIDEO_COMPOSER);
++	if (ret) {
+ 		v4l2_err(&dev->v4l2_dev,
+-			 "Failed to initialize V4L2 M2M device\n");
+-		ret = PTR_ERR(dev->m2m_dev);
+-
++			 "Failed to initialize V4L2 M2M media controller\n");
+ 		goto err_video;
+ 	}
+ 
++	ret = media_device_register(&dev->mdev);
++	if (ret) {
++		v4l2_err(&dev->v4l2_dev, "Failed to register media device\n");
++		goto err_m2m_mc;
++	}
++
+ 	platform_set_drvdata(pdev, dev);
+ 
+ 	pm_runtime_enable(dev->dev);
+@@ -1134,17 +1238,22 @@ static int deinterlace_probe(struct platform_device *pdev)
+ 	if (ret < 0) {
+ 		dev_err(dev->dev, "Failed to enable module\n");
+ 
+-		goto err_m2m;
++		goto err_mdev;
+ 	}
+ 	pm_runtime_put(dev->dev);
+ 
+ 	return 0;
+ 
+-err_m2m:
++err_mdev:
+ 	pm_runtime_disable(dev->dev);
+-	v4l2_m2m_release(dev->m2m_dev);
++	media_device_unregister(&dev->mdev);
++err_m2m_mc:
++	v4l2_m2m_unregister_media_controller(dev->m2m_dev);
+ err_video:
+ 	video_unregister_device(&dev->vfd);
++err_media:
++	media_device_cleanup(&dev->mdev);
++	v4l2_m2m_release(dev->m2m_dev);
+ err_v4l2:
+ 	v4l2_device_unregister(&dev->v4l2_dev);
+ 
+@@ -1155,6 +1264,12 @@ static void deinterlace_remove(struct platform_device *pdev)
+ {
+ 	struct deinterlace_dev *dev = platform_get_drvdata(pdev);
+ 
++	if (media_devnode_is_registered(dev->mdev.devnode)) {
++		media_device_unregister(&dev->mdev);
++		v4l2_m2m_unregister_media_controller(dev->m2m_dev);
++		media_device_cleanup(&dev->mdev);
++	}
++
+ 	v4l2_m2m_release(dev->m2m_dev);
+ 	video_unregister_device(&dev->vfd);
+ 	v4l2_device_unregister(&dev->v4l2_dev);
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
+index 8b64ba5036c0a3..bf52cf1bc6b3f3 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
+@@ -8,6 +8,8 @@
+ #ifndef _SUN50I_DI300_H_
+ #define _SUN50I_DI300_H_
+ 
++#include <media/media-device.h>
++#include <media/media-request.h>
+ #include <media/v4l2-ctrls.h>
+ #include <media/v4l2-device.h>
+ #include <media/v4l2-mem2mem.h>
+@@ -235,6 +237,14 @@ struct deinterlace_ctx {
+ 	int			aborting;
+ 
+ 	struct v4l2_ctrl_handler hdl;
++
++	/*
++	 * Request bound to the in-flight job's OUTPUT buffer, if any, and
++	 * whether FMD is actually active for that job (has_fmd && req).
++	 * Set in device_run(), consumed and cleared in the IRQ handler.
++	 */
++	struct media_request	*req;
++	bool			fmd_active;
+ };
+ 
+ struct deinterlace_dev {
+@@ -242,6 +252,7 @@ struct deinterlace_dev {
+ 	struct video_device	vfd;
+ 	struct device		*dev;
+ 	struct v4l2_m2m_dev	*m2m_dev;
++	struct media_device	mdev;
+ 
+ 	/* Device file mutex */
+ 	struct mutex		dev_mutex;

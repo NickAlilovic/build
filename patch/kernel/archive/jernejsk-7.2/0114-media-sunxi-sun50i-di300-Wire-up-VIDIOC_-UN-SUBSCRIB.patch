@@ -1,0 +1,44 @@
+From 6c04f78af0c6b9ec93157f9031175c60eb8408cd Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Tue, 21 Jul 2026 15:24:55 +0200
+Subject: [PATCH] media: sunxi: sun50i-di300: Wire up
+ VIDIOC_(UN)SUBSCRIBE_EVENT
+
+Found by running v4l2-compliance: VIDIOC_SUBSCRIBE_EVENT had no
+ioctl_ops entry at all, unlike G/S/TRY_EXT_CTRLS which the v4l2_fh
+core already dispatches automatically via ctrl_handler. Subscribing to
+V4L2_EVENT_CTRL for any control, including the pre-existing FMD stats
+one, failed outright with no way for userspace to be notified of
+control changes. Pre-existing gap, not specific to Request API work;
+just never exercised before.
+---
+ drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c | 3 +++
+ drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h | 1 +
+ 2 files changed, 4 insertions(+)
+
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+index 971b03f9f02da7..98dc7255f2bd8b 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+@@ -716,6 +716,9 @@ static const struct v4l2_ioctl_ops deinterlace_ioctl_ops = {
+ 
+ 	.vidioc_streamon		= v4l2_m2m_ioctl_streamon,
+ 	.vidioc_streamoff		= v4l2_m2m_ioctl_streamoff,
++
++	.vidioc_subscribe_event		= v4l2_ctrl_subscribe_event,
++	.vidioc_unsubscribe_event	= v4l2_event_unsubscribe,
+ };
+ 
+ static int deinterlace_queue_setup(struct vb2_queue *vq, unsigned int *nbuffers,
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
+index bf52cf1bc6b3f3..06e717af059f4d 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
+@@ -12,6 +12,7 @@
+ #include <media/media-request.h>
+ #include <media/v4l2-ctrls.h>
+ #include <media/v4l2-device.h>
++#include <media/v4l2-event.h>
+ #include <media/v4l2-mem2mem.h>
+ #include <media/videobuf2-v4l2.h>
+ #include <media/videobuf2-dma-contig.h>

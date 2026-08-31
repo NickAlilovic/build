@@ -1,0 +1,386 @@
+From f11740bb231b5498ea4924713399d6502cfca852 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Tue, 21 Jul 2026 16:30:22 +0200
+Subject: [PATCH] media: sunxi: sun50i-di300: Wire per-job field weave into
+ DIT_INTER_PARA
+
+Adds the actual hardware effect FMD lock is for: when userspace's
+cadence classifier (built on the existing FMD stats) confirms genuine
+telecined content, DIT_INTER_PARA can select a direct field weave for
+either output instead of the motion-adaptive blend DIT_SETTING
+otherwise configures -- cheaper and more accurate than motion
+interpolation for content that really is two matching real fields,
+verbatim from the vendor's own dit_inter_para register usage
+(field_weave_f1/f2, field_weave_phase_f1/f2; chroma weave is never
+enabled, matching the vendor reference driver's own "for safety"
+comment). No new buffer/DMA addressing needed: the weave reuses
+whichever of the job's existing IN_F0/F1/F2 inputs the phase selects.
+
+V4L2_CID_SUNXI_DI300_FMD_WEAVE is a 2-element per-job control (one
+slot per output), bound to a request the way stateless codec input
+controls are -- unlike the stats control, this one genuinely is a
+per-job input with nothing to read back, so none of the buffer-
+retention timing problems that ruled out the Request API for stats
+apply here: v4l2_ctrl_request_setup() applies it and
+v4l2_ctrl_request_complete() finishes it synchronously in
+device_run(), before the job runs, mirroring how cedrus handles VP9's
+(also input-only, also request-bound) per-frame controls.
+
+Re-adds the media_device/req_validate/req_queue/buf_out_validate/
+buf_request_complete/supports_requests removed in the FMD_ENABLE
+change -- this time for a control shape where the Request API is
+actually the right tool, not gating a value that has no per-job input
+to bind to.
+---
+ .../sunxi/sun50i-di300/sun50i-di300.c         | 174 ++++++++++++++++--
+ .../sunxi/sun50i-di300/sun50i-di300.h         |  31 ++++
+ 2 files changed, 193 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+index 7144badd21ba1f..7fcf5bd6017e4a 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+@@ -192,6 +192,20 @@ static void deinterlace_device_run(void *priv)
+ 
+ 	ctx->fmd_active = dev->has_fmd && ctx->fmd_enabled;
+ 
++	/*
++	 * Apply this job's field-weave decision, if userspace attached a
++	 * request to the OUTPUT buffer carrying one. Complete it right
++	 * away: unlike the stats control, nothing here needs to wait for
++	 * the buffer's eventual release, since this is an input applied
++	 * before the job runs, not output read back after.
++	 */
++	ctx->req = src->vb2_buf.req_obj.req;
++	if (ctx->req) {
++		v4l2_ctrl_request_setup(ctx->req, &ctx->hdl);
++		v4l2_ctrl_request_complete(ctx->req, &ctx->hdl);
++		ctx->req = NULL;
++	}
++
+ 	/*
+ 	 * Pick the two buffers actually at the front of the ready
+ 	 * queue. v4l2_m2m_last_dst_buf() returns the tail of the whole
+@@ -339,6 +353,24 @@ static void deinterlace_device_run(void *priv)
+ 		       DEINTERLACE_DIT_SETTING_MOTION_BLEND_CHROMA;
+ 	deinterlace_write(dev, DEINTERLACE_DIT_SETTING, reg);
+ 
++	reg = DEINTERLACE_DIT_INTER_PARA_DEFAULT;
++	if (ctx->fmd_active && ctx->weave_ctrl) {
++		unsigned int phase0, phase1;
++
++		v4l2_ctrl_lock(ctx->weave_ctrl);
++		phase0 = ctx->weave_ctrl->p_cur.p_u32[0];
++		phase1 = ctx->weave_ctrl->p_cur.p_u32[1];
++		v4l2_ctrl_unlock(ctx->weave_ctrl);
++
++		if (phase0 < 3)
++			reg |= DEINTERLACE_DIT_INTER_PARA_FIELD_WEAVE_F1 |
++			       DEINTERLACE_DIT_INTER_PARA_FIELD_WEAVE_PHASE_F1(phase0);
++		if (phase1 < 3)
++			reg |= DEINTERLACE_DIT_INTER_PARA_FIELD_WEAVE_F2 |
++			       DEINTERLACE_DIT_INTER_PARA_FIELD_WEAVE_PHASE_F2(phase1);
++	}
++	deinterlace_write(dev, DEINTERLACE_DIT_INTER_PARA, reg);
++
+ 	reg = DEINTERLACE_DMA_CTL_C | DEINTERLACE_DMA_CTL_P |
+ 	      DEINTERLACE_DMA_CTL_DI | DEINTERLACE_DMA_CTL_W0 |
+ 	      DEINTERLACE_DMA_CTL_W1 | DEINTERLACE_DMA_CTL_MCLK_GATE;
+@@ -444,8 +476,7 @@ static void deinterlace_init(struct deinterlace_dev *dev)
+ 			  DEINTERLACE_DIT_CHR_PARA1_DEFAULT);
+ 	deinterlace_write(dev, DEINTERLACE_DIT_INTRA_PARA,
+ 			  DEINTERLACE_DIT_INTRA_PARA_DEFAULT);
+-	deinterlace_write(dev, DEINTERLACE_DIT_INTER_PARA,
+-			  DEINTERLACE_DIT_INTER_PARA_DEFAULT);
++	/* DEINTERLACE_DIT_INTER_PARA is written every job in device_run() */
+ 	deinterlace_write(dev, DEINTERLACE_DIT_DEMO_H, 0);
+ 	deinterlace_write(dev, DEINTERLACE_DIT_DEMO_V, 0);
+ 
+@@ -751,6 +782,23 @@ static void deinterlace_buf_queue(struct vb2_buffer *vb)
+ 	v4l2_m2m_buf_queue(ctx->fh.m2m_ctx, vbuf);
+ }
+ 
++static int deinterlace_buf_out_validate(struct vb2_buffer *vb)
++{
++	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
++	struct deinterlace_ctx *ctx = vb2_get_drv_priv(vb->vb2_queue);
++
++	vbuf->field = ctx->src_fmt.field;
++
++	return 0;
++}
++
++static void deinterlace_buf_request_complete(struct vb2_buffer *vb)
++{
++	struct deinterlace_ctx *ctx = vb2_get_drv_priv(vb->vb2_queue);
++
++	v4l2_ctrl_request_complete(vb->req_obj.req, &ctx->hdl);
++}
++
+ static void deinterlace_queue_cleanup(struct vb2_queue *vq, u32 state)
+ {
+ 	struct deinterlace_ctx *ctx = vb2_get_drv_priv(vq);
+@@ -851,6 +899,8 @@ static const struct vb2_ops deinterlace_qops = {
+ 	.queue_setup		= deinterlace_queue_setup,
+ 	.buf_prepare		= deinterlace_buf_prepare,
+ 	.buf_queue		= deinterlace_buf_queue,
++	.buf_out_validate	= deinterlace_buf_out_validate,
++	.buf_request_complete	= deinterlace_buf_request_complete,
+ 	.start_streaming	= deinterlace_start_streaming,
+ 	.stop_streaming		= deinterlace_stop_streaming,
+ };
+@@ -870,6 +920,7 @@ static int deinterlace_queue_init(void *priv, struct vb2_queue *src_vq,
+ 	src_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
+ 	src_vq->lock = &ctx->dev->dev_mutex;
+ 	src_vq->dev = ctx->dev->dev;
++	src_vq->supports_requests = true;
+ 
+ 	ret = vb2_queue_init(src_vq);
+ 	if (ret)
+@@ -972,6 +1023,29 @@ static const struct v4l2_ctrl_config deinterlace_fmd_enable_ctrl = {
+ 	.def	= 0,
+ };
+ 
++/*
++ * Per-job field-weave decision: [0] for the job's first output
++ * (dst0), [1] for its second (dst1). 0-2 select a weave phase for
++ * that output (direct field combine instead of motion-adaptive
++ * blend); 3 disables weave for that output, falling back to whatever
++ * DIT_SETTING already configures. Bound to a request the way
++ * stateless codec controls are -- see the comment on ctx->weave_ctrl.
++ */
++#define V4L2_CID_SUNXI_DI300_FMD_WEAVE	(V4L2_CID_USER_BASE + 0x1102)
++#define DEINTERLACE_FMD_WEAVE_COUNT	2
++#define DEINTERLACE_FMD_WEAVE_DISABLED	3
++
++static const struct v4l2_ctrl_config deinterlace_fmd_weave_ctrl = {
++	.id	= V4L2_CID_SUNXI_DI300_FMD_WEAVE,
++	.name	= "FMD Field Weave",
++	.type	= V4L2_CTRL_TYPE_U32,
++	.min	= 0,
++	.max	= DEINTERLACE_FMD_WEAVE_DISABLED,
++	.step	= 1,
++	.def	= DEINTERLACE_FMD_WEAVE_DISABLED,
++	.dims	= { DEINTERLACE_FMD_WEAVE_COUNT },
++};
++
+ static int deinterlace_open(struct file *file)
+ {
+ 	struct deinterlace_dev *dev = video_drvdata(file);
+@@ -1003,9 +1077,12 @@ static int deinterlace_open(struct file *file)
+ 	ctx->dev = dev;
+ 
+ 	if (dev->has_fmd) {
+-		v4l2_ctrl_handler_init(&ctx->hdl, 2);
++		v4l2_ctrl_handler_init(&ctx->hdl, 3);
+ 		v4l2_ctrl_new_custom(&ctx->hdl, &deinterlace_fmd_stats_ctrl, NULL);
+ 		v4l2_ctrl_new_custom(&ctx->hdl, &deinterlace_fmd_enable_ctrl, NULL);
++		ctx->weave_ctrl = v4l2_ctrl_new_custom(&ctx->hdl,
++						      &deinterlace_fmd_weave_ctrl,
++						      NULL);
+ 		if (ctx->hdl.error) {
+ 			ret = ctx->hdl.error;
+ 			v4l2_ctrl_handler_free(&ctx->hdl);
+@@ -1081,6 +1158,45 @@ static const struct v4l2_m2m_ops deinterlace_m2m_ops = {
+ 	.job_abort	= deinterlace_job_abort,
+ };
+ 
++static int deinterlace_request_validate(struct media_request *req)
++{
++	struct media_request_object *obj;
++	struct deinterlace_ctx *ctx = NULL;
++	unsigned int count;
++
++	list_for_each_entry(obj, &req->objects, list) {
++		struct vb2_buffer *vb;
++
++		if (vb2_request_object_is_buffer(obj)) {
++			vb = container_of(obj, struct vb2_buffer, req_obj);
++			ctx = vb2_get_drv_priv(vb->vb2_queue);
++
++			break;
++		}
++	}
++
++	if (!ctx)
++		return -ENOENT;
++
++	count = vb2_request_buffer_cnt(req);
++	if (!count) {
++		v4l2_info(&ctx->dev->v4l2_dev,
++			  "No buffer was provided with the request\n");
++		return -ENOENT;
++	} else if (count > 1) {
++		v4l2_info(&ctx->dev->v4l2_dev,
++			  "More than one buffer was provided with the request\n");
++		return -EINVAL;
++	}
++
++	return vb2_request_validate(req);
++}
++
++static const struct media_device_ops deinterlace_media_ops = {
++	.req_validate	= deinterlace_request_validate,
++	.req_queue	= v4l2_m2m_request_queue,
++};
++
+ static int deinterlace_probe(struct platform_device *pdev)
+ {
+ 	struct deinterlace_dev *dev;
+@@ -1148,25 +1264,48 @@ static int deinterlace_probe(struct platform_device *pdev)
+ 		 deinterlace_video_device.name);
+ 	video_set_drvdata(vfd, dev);
+ 
++	dev->m2m_dev = v4l2_m2m_init(&deinterlace_m2m_ops);
++	if (IS_ERR(dev->m2m_dev)) {
++		v4l2_err(&dev->v4l2_dev,
++			 "Failed to initialize V4L2 M2M device\n");
++		ret = PTR_ERR(dev->m2m_dev);
++
++		goto err_v4l2;
++	}
++
++	dev->mdev.dev = &pdev->dev;
++	strscpy(dev->mdev.model, DEINTERLACE_NAME, sizeof(dev->mdev.model));
++	strscpy(dev->mdev.bus_info, "platform:" DEINTERLACE_NAME,
++		sizeof(dev->mdev.bus_info));
++
++	media_device_init(&dev->mdev);
++	dev->mdev.ops = &deinterlace_media_ops;
++	dev->v4l2_dev.mdev = &dev->mdev;
++
+ 	ret = video_register_device(vfd, VFL_TYPE_VIDEO, 0);
+ 	if (ret) {
+ 		v4l2_err(&dev->v4l2_dev, "Failed to register video device\n");
+ 
+-		goto err_v4l2;
++		goto err_media;
+ 	}
+ 
+ 	v4l2_info(&dev->v4l2_dev,
+ 		  "Device registered as /dev/video%d\n", vfd->num);
+ 
+-	dev->m2m_dev = v4l2_m2m_init(&deinterlace_m2m_ops);
+-	if (IS_ERR(dev->m2m_dev)) {
++	ret = v4l2_m2m_register_media_controller(dev->m2m_dev, vfd,
++						 MEDIA_ENT_F_PROC_VIDEO_COMPOSER);
++	if (ret) {
+ 		v4l2_err(&dev->v4l2_dev,
+-			 "Failed to initialize V4L2 M2M device\n");
+-		ret = PTR_ERR(dev->m2m_dev);
+-
++			 "Failed to initialize V4L2 M2M media controller\n");
+ 		goto err_video;
+ 	}
+ 
++	ret = media_device_register(&dev->mdev);
++	if (ret) {
++		v4l2_err(&dev->v4l2_dev, "Failed to register media device\n");
++		goto err_m2m_mc;
++	}
++
+ 	platform_set_drvdata(pdev, dev);
+ 
+ 	pm_runtime_enable(dev->dev);
+@@ -1181,17 +1320,22 @@ static int deinterlace_probe(struct platform_device *pdev)
+ 	if (ret < 0) {
+ 		dev_err(dev->dev, "Failed to enable module\n");
+ 
+-		goto err_m2m;
++		goto err_mdev;
+ 	}
+ 	pm_runtime_put(dev->dev);
+ 
+ 	return 0;
+ 
+-err_m2m:
++err_mdev:
+ 	pm_runtime_disable(dev->dev);
+-	v4l2_m2m_release(dev->m2m_dev);
++	media_device_unregister(&dev->mdev);
++err_m2m_mc:
++	v4l2_m2m_unregister_media_controller(dev->m2m_dev);
+ err_video:
+ 	video_unregister_device(&dev->vfd);
++err_media:
++	media_device_cleanup(&dev->mdev);
++	v4l2_m2m_release(dev->m2m_dev);
+ err_v4l2:
+ 	v4l2_device_unregister(&dev->v4l2_dev);
+ 
+@@ -1202,6 +1346,12 @@ static void deinterlace_remove(struct platform_device *pdev)
+ {
+ 	struct deinterlace_dev *dev = platform_get_drvdata(pdev);
+ 
++	if (media_devnode_is_registered(dev->mdev.devnode)) {
++		media_device_unregister(&dev->mdev);
++		v4l2_m2m_unregister_media_controller(dev->m2m_dev);
++		media_device_cleanup(&dev->mdev);
++	}
++
+ 	v4l2_m2m_release(dev->m2m_dev);
+ 	video_unregister_device(&dev->vfd);
+ 	v4l2_device_unregister(&dev->v4l2_dev);
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
+index 2c51e083456d0b..683db145585c96 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
+@@ -8,6 +8,8 @@
+ #ifndef _SUN50I_DI300_H_
+ #define _SUN50I_DI300_H_
+ 
++#include <media/media-device.h>
++#include <media/media-request.h>
+ #include <media/v4l2-ctrls.h>
+ #include <media/v4l2-device.h>
+ #include <media/v4l2-event.h>
+@@ -134,6 +136,20 @@
+ 
+ #define DEINTERLACE_DIT_INTER_PARA		0x1b4
+ #define DEINTERLACE_DIT_INTER_PARA_DEFAULT		0x22000000
++/*
++ * Per-output-slot override: when set, that slot's output is a direct
++ * field weave (combining two real fields verbatim) instead of the
++ * motion-adaptive blend DIT_SETTING otherwise configures -- cheaper
++ * and more accurate than motion interpolation, but only correct when
++ * userspace's cadence detection built on the FMD stats has confirmed
++ * the source is genuinely telecined film content. Chroma weave is
++ * deliberately never enabled here, matching the vendor reference
++ * driver's own "for safety" comment.
++ */
++#define DEINTERLACE_DIT_INTER_PARA_FIELD_WEAVE_F1	BIT(0)
++#define DEINTERLACE_DIT_INTER_PARA_FIELD_WEAVE_PHASE_F1(v)	(((v) & 3) << 4)
++#define DEINTERLACE_DIT_INTER_PARA_FIELD_WEAVE_F2	BIT(16)
++#define DEINTERLACE_DIT_INTER_PARA_FIELD_WEAVE_PHASE_F2(v)	(((v) & 3) << 20)
+ 
+ #define DEINTERLACE_DIT_CROP_H			0x1c0
+ #define DEINTERLACE_DIT_CROP_V			0x1c4
+@@ -246,6 +262,20 @@ struct deinterlace_ctx {
+ 	 */
+ 	bool			fmd_enabled;
+ 	bool			fmd_active;
++
++	/*
++	 * Per-job field-weave decision, unlike FMD_ENABLE/FMD_STATS above:
++	 * this genuinely is per-job input (which of dst0/dst1 should be a
++	 * direct field weave, and at what phase, based on userspace's
++	 * cadence classification of the *previous* job's stats), so it is
++	 * bound to a request the way stateless codec controls are.
++	 * Request completion here needs no special handling for buffer
++	 * retention like the stats control did: the value is applied and
++	 * the request completed synchronously in device_run(), before the
++	 * job runs, not read back after.
++	 */
++	struct v4l2_ctrl	*weave_ctrl;
++	struct media_request	*req;
+ };
+ 
+ struct deinterlace_dev {
+@@ -253,6 +283,7 @@ struct deinterlace_dev {
+ 	struct video_device	vfd;
+ 	struct device		*dev;
+ 	struct v4l2_m2m_dev	*m2m_dev;
++	struct media_device	mdev;
+ 
+ 	/* Device file mutex */
+ 	struct mutex		dev_mutex;

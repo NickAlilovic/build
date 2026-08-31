@@ -1,0 +1,31 @@
+From 780bad6417ee9fbcf1c3f67d33f2a73dff55933d Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Tue, 21 Jul 2026 15:13:37 +0200
+Subject: [PATCH] media: sunxi: sun50i-di300: Drop min_queued_buffers on the
+ request queue
+
+vb2_core_queue_init() WARN_ONs and fails outright when a queue has
+both supports_requests and a non-zero min_queued_buffers: with
+requests, queueing a buffer must always succeed, but a non-zero
+minimum can force start_streaming() to run (and possibly fail) from
+inside vb2_core_qbuf(), with no way to report that failure back to
+userspace. This broke every client, request-based or not, since
+vb2_queue_init() failed unconditionally for the OUTPUT queue.
+job_ready() already requires at least one source buffer explicitly, so
+dropping the vb2-level minimum doesn't change actual job readiness.
+---
+ drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+index 41ea7a43683284..971b03f9f02da7 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+@@ -901,7 +901,6 @@ static int deinterlace_queue_init(void *priv, struct vb2_queue *src_vq,
+ 	src_vq->io_modes = VB2_MMAP | VB2_DMABUF;
+ 	src_vq->drv_priv = ctx;
+ 	src_vq->buf_struct_size = sizeof(struct v4l2_m2m_buffer);
+-	src_vq->min_queued_buffers = 1;
+ 	src_vq->ops = &deinterlace_qops;
+ 	src_vq->mem_ops = &vb2_dma_contig_memops;
+ 	src_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;

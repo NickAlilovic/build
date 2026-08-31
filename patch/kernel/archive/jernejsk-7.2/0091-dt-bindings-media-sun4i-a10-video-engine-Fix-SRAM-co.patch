@@ -1,0 +1,62 @@
+From 4dbe9a8d3a4bcb4c7a333440d72b25eb716b3a0e Mon Sep 17 00:00:00 2001
+From: Chen-Yu Tsai <wens@kernel.org>
+Date: Sat, 11 Jul 2026 21:59:53 +0800
+Subject: [PATCH] dt-bindings: media: sun4i-a10-video-engine: Fix SRAM count
+ for H6
+
+On the H6, the SRAM C region includes an alias of part of the VE SRAM
+used by the video engine. This region should also be claimed so that no
+access happens through the alias window.
+
+Add a second SRAM region phandle to the video engine for the H6.
+
+Acked-by: Rob Herring (Arm) <robh@kernel.org>
+Reviewed-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+Signed-off-by: Chen-Yu Tsai <wens@kernel.org>
+---
+ .../allwinner,sun4i-a10-video-engine.yaml     | 21 ++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-video-engine.yaml b/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-video-engine.yaml
+index 932043d7f0cc4a..818d815d473202 100644
+--- a/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-video-engine.yaml
++++ b/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-video-engine.yaml
+@@ -48,11 +48,15 @@ properties:
+ 
+   allwinner,sram:
+     $ref: /schemas/types.yaml#/definitions/phandle-array
++    minItems: 1
+     items:
+       - items:
+           - description: phandle to SRAM
+           - description: register value for device
+-    description: Phandle to the device SRAM
++      - items:
++          - description: phandle to SRAM alias
++          - description: register value for device
++    description: Phandle to the device SRAM(s)
+ 
+   iommus:
+     minItems: 1
+@@ -101,6 +105,21 @@ allOf:
+         iommus:
+           maxItems: 1
+ 
++  - if:
++      properties:
++        compatible:
++          contains:
++            enum:
++              - allwinner,sun50i-h6-video-engine
++    then:
++      properties:
++        allwinner,sram:
++          minItems: 2
++    else:
++      properties:
++        allwinner,sram:
++          maxItems: 1
++
+ additionalProperties: false
+ 
+ examples:

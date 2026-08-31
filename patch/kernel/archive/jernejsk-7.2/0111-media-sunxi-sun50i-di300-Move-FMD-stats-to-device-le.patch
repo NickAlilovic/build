@@ -1,0 +1,104 @@
+From 2f4314439f29dea641eeccedabd63446a43713e5 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Tue, 21 Jul 2026 14:38:17 +0200
+Subject: [PATCH] media: sunxi: sun50i-di300: Move FMD stats to device level
+
+ctx-scoped fmd_stats meant the control could only ever be read back
+through the same fd whose ctx happened to submit the job that
+produced them: any other open() of the device got its own zeroed
+ctx and could never see live values, since there's only ever one job
+running on the shared hardware regardless of which fd submitted it.
+Move the snapshot to deinterlace_dev so any client can query the last
+job's counters, not just the one that happened to trigger them.
+---
+ .../sunxi/sun50i-di300/sun50i-di300.c         | 39 ++++++++++---------
+ .../sunxi/sun50i-di300/sun50i-di300.h         | 11 +++++-
+ 2 files changed, 29 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+index ce26c0b03e291f..5e19a93f3272a5 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+@@ -390,24 +390,24 @@ static irqreturn_t deinterlace_irq(int irq, void *data)
+ 	state = ctx->aborting ? VB2_BUF_STATE_ERROR : VB2_BUF_STATE_DONE;
+ 
+ 	if (dev->has_fmd) {
+-		ctx->fmd_stats[0] = deinterlace_read(dev, DEINTERLACE_FMD_FID12) &
+-				     DEINTERLACE_FMD_HIST_CNT_MASK;
+-		ctx->fmd_stats[1] = deinterlace_read(dev, DEINTERLACE_FMD_FID23) &
+-				     DEINTERLACE_FMD_HIST_CNT_MASK;
+-		ctx->fmd_stats[2] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID30) &
+-				     DEINTERLACE_FMD_HIST_CNT_MASK;
+-		ctx->fmd_stats[3] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID32) &
+-				     DEINTERLACE_FMD_HIST_CNT_MASK;
+-		ctx->fmd_stats[4] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID10) &
+-				     DEINTERLACE_FMD_HIST_CNT_MASK;
+-		ctx->fmd_stats[5] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID12) &
+-				     DEINTERLACE_FMD_HIST_CNT_MASK;
+-		ctx->fmd_stats[6] = deinterlace_read(dev, DEINTERLACE_FMD_FRD02) &
+-				     DEINTERLACE_FMD_HIST_CNT_MASK;
+-		ctx->fmd_stats[7] = deinterlace_read(dev, DEINTERLACE_FMD_FRD13) &
+-				     DEINTERLACE_FMD_HIST_CNT_MASK;
+-		ctx->fmd_stats[8] = deinterlace_read(dev, DEINTERLACE_FMD_FIELD_HIST0);
+-		ctx->fmd_stats[9] = deinterlace_read(dev, DEINTERLACE_FMD_FIELD_HIST1);
++		dev->fmd_stats[0] = deinterlace_read(dev, DEINTERLACE_FMD_FID12) &
++				    DEINTERLACE_FMD_HIST_CNT_MASK;
++		dev->fmd_stats[1] = deinterlace_read(dev, DEINTERLACE_FMD_FID23) &
++				    DEINTERLACE_FMD_HIST_CNT_MASK;
++		dev->fmd_stats[2] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID30) &
++				    DEINTERLACE_FMD_HIST_CNT_MASK;
++		dev->fmd_stats[3] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID32) &
++				    DEINTERLACE_FMD_HIST_CNT_MASK;
++		dev->fmd_stats[4] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID10) &
++				    DEINTERLACE_FMD_HIST_CNT_MASK;
++		dev->fmd_stats[5] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID12) &
++				    DEINTERLACE_FMD_HIST_CNT_MASK;
++		dev->fmd_stats[6] = deinterlace_read(dev, DEINTERLACE_FMD_FRD02) &
++				    DEINTERLACE_FMD_HIST_CNT_MASK;
++		dev->fmd_stats[7] = deinterlace_read(dev, DEINTERLACE_FMD_FRD13) &
++				    DEINTERLACE_FMD_HIST_CNT_MASK;
++		dev->fmd_stats[8] = deinterlace_read(dev, DEINTERLACE_FMD_FIELD_HIST0);
++		dev->fmd_stats[9] = deinterlace_read(dev, DEINTERLACE_FMD_FIELD_HIST1);
+ 	}
+ 
+ 	dst0 = ctx->dst0;
+@@ -899,7 +899,8 @@ static int deinterlace_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
+ 
+ 	switch (ctrl->id) {
+ 	case V4L2_CID_SUNXI_DI300_FMD_STATS:
+-		memcpy(ctrl->p_new.p_u32, ctx->fmd_stats, sizeof(ctx->fmd_stats));
++		memcpy(ctrl->p_new.p_u32, ctx->dev->fmd_stats,
++		       sizeof(ctx->dev->fmd_stats));
+ 		break;
+ 	default:
+ 		return -EINVAL;
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
+index c15318243dd9fc..8b64ba5036c0a3 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
+@@ -234,9 +234,7 @@ struct deinterlace_ctx {
+ 
+ 	int			aborting;
+ 
+-	/* raw FMD counters latched at the last completed job, if any */
+ 	struct v4l2_ctrl_handler hdl;
+-	u32			fmd_stats[DEINTERLACE_FMD_STATS_COUNT];
+ };
+ 
+ struct deinterlace_dev {
+@@ -257,6 +255,15 @@ struct deinterlace_dev {
+ 
+ 	/* set once at probe from DEINTERLACE_FUNC_VSN, never changes */
+ 	bool			has_fmd;
++
++	/*
++	 * Raw FMD counters latched at the last completed job, if any.
++	 * Device-level rather than per-ctx: there is only ever one job
++	 * running regardless of which fd's ctx submitted it, and this
++	 * lets any client query them, not just the one holding the fd
++	 * that happened to submit that job.
++	 */
++	u32			fmd_stats[DEINTERLACE_FMD_STATS_COUNT];
+ };
+ 
+ #endif

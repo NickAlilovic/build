@@ -1,0 +1,69 @@
+From da406c933f62adc162fce8e776f132d8f8e0d9fd Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Fri, 9 Jul 2021 22:04:17 +0200
+Subject: [PATCH] TX6 ethernet hack
+
+---
+ .../boot/dts/allwinner/sun50i-h6-tanix.dtsi      | 16 ++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi     |  7 +++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-tanix.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6-tanix.dtsi
+index bb7de37c0d58be..db9c76a97e17aa 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6-tanix.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-tanix.dtsi
+@@ -10,6 +10,7 @@
+ 
+ / {
+ 	aliases {
++		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -104,6 +105,14 @@
+ 	status = "okay";
+ };
+ 
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ext_rmii_pins>;
++	phy-mode = "rmii";
++	phy-handle = <&rmii_phy>;
++	status = "okay";
++};
++
+ &gpu {
+ 	mali-supply = <&reg_vdd_cpu_gpu>;
+ 	status = "okay";
+@@ -119,6 +128,13 @@
+ 	};
+ };
+ 
++&mdio {
++	rmii_phy: ethernet-phy@1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+index 58ab216b9d6e41..941c3b4b8fd8c8 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+@@ -404,6 +404,13 @@
+ 				drive-strength = <40>;
+ 			};
+ 
++			ext_rmii_pins: rmii_pins {
++				pins = "PA0", "PA1", "PA2", "PA3", "PA4",
++				       "PA5", "PA6", "PA7", "PA8", "PA9";
++				function = "emac";
++				drive-strength = <40>;
++			};
++
+ 			hdmi_pins: hdmi-pins {
+ 				pins = "PH8", "PH9", "PH10";
+ 				function = "hdmi";

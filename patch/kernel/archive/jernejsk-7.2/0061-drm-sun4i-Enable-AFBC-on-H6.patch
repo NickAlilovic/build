@@ -1,0 +1,25 @@
+From 9a93153356be5033ec585c6bef34b1f6544099bb Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 18 Jul 2026 13:59:31 +0200
+Subject: [PATCH] drm/sun4i: Enable AFBC on H6
+
+The H6 DE3 mixer provides an AFBC decompressor on its single VI
+channel. Advertise the supported AFBC formats and modifiers on that plane.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index d9040621962647..d5c5dc7f70de2c 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -1019,6 +1019,7 @@ static const struct sun8i_mixer_cfg sun50i_a64_mixer1_cfg = {
+ static const struct sun8i_mixer_cfg sun50i_h6_mixer0_cfg = {
+ 	.lay_cfg = {
+ 		.de_type	= SUN8I_MIXER_DE3,
++		.afbc_mask	= BIT(0),
+ 		.vi_scaler_num	= 1,
+ 		.scaler_type	= {
+ 			SUN8I_SCALER_VI_ED,

@@ -1,0 +1,39 @@
+From 0b72e4ee74b993e2a1523e1fb12a18fbe657a194 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 14 Mar 2026 13:01:24 +0100
+Subject: [PATCH] drm/sun4i: vi scaler: Set global alpha
+
+>From DE3 onward, there is global alpha register. Set it to 0xff, which
+represents opaque value.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun8i_vi_scaler.c | 2 ++
+ drivers/gpu/drm/sun4i/sun8i_vi_scaler.h | 1 +
+ 2 files changed, 3 insertions(+)
+
+diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c b/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c
+index 14b8c229ca68b9..58a9f78fbd14ae 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c
++++ b/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c
+@@ -965,6 +965,8 @@ void sun8i_vi_scaler_setup(struct sun8i_layer *layer,
+ 
+ 		regmap_write(layer->regs,
+ 			     SUN50I_SCALER_VSU_SCALE_MODE(base), val);
++		regmap_write(layer->regs,
++			     SUN50I_SCALER_VSU_GLB_ALPHA(base), 0xff);
+ 	}
+ 
+ 	regmap_write(layer->regs,
+diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_scaler.h b/drivers/gpu/drm/sun4i/sun8i_vi_scaler.h
+index 245fe2f431c3c1..d89c0cbe188dd0 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_vi_scaler.h
++++ b/drivers/gpu/drm/sun4i/sun8i_vi_scaler.h
+@@ -36,6 +36,7 @@
+ #define SUN50I_SCALER_VSU_EDSCL_CTRL(base)		((base) + 0x28)
+ #define SUN50I_SCALER_VSU_ANGLE_THR(base)		((base) + 0x2c)
+ #define SUN8I_SCALER_VSU_OUTSIZE(base)		((base) + 0x40)
++#define SUN50I_SCALER_VSU_GLB_ALPHA(base)	((base) + 0x44)
+ #define SUN8I_SCALER_VSU_YINSIZE(base)		((base) + 0x80)
+ #define SUN8I_SCALER_VSU_YHSTEP(base)		((base) + 0x88)
+ #define SUN8I_SCALER_VSU_YVSTEP(base)		((base) + 0x8c)

@@ -1,0 +1,54 @@
+From 7b2c8654a61186963adf363d695a1e5a43d14c00 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 14 Mar 2026 12:12:10 +0100
+Subject: [PATCH] drm/sun4i: vi scaler: Fix coefficient selection
+
+Currently, vertical coefficients are selected based on horizontal
+scaling, which is wrong. Additionally, chroma coefficients should be
+selected based on format subsampling.
+
+Fix all that.
+
+Fixes: b862a648de3b ("drm/sun4i: Add support for HW scaling to DE2")
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun8i_vi_scaler.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c b/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c
+index 3dec4eeb1ba21d..d4412a62c2f070 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c
++++ b/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c
+@@ -894,20 +894,26 @@ static void sun8i_vi_scaler_set_coeff(struct regmap *map, u32 base,
+ 			     lan3coefftab32_left[offset + i]);
+ 		regmap_write(map, SUN8I_SCALER_VSU_YHCOEFF1(base, i),
+ 			     lan3coefftab32_right[offset + i]);
++	}
++	offset = sun8i_vi_scaler_coef_index(vstep) *
++			SUN8I_VI_SCALER_COEFF_COUNT;
++	for (i = 0; i < SUN8I_VI_SCALER_COEFF_COUNT; i++)
++		regmap_write(map, SUN8I_SCALER_VSU_YVCOEFF(base, i),
++			     lan2coefftab32[offset + i]);
++
++	offset = sun8i_vi_scaler_coef_index(hstep / format->hsub) *
++			SUN8I_VI_SCALER_COEFF_COUNT;
++	for (i = 0; i < SUN8I_VI_SCALER_COEFF_COUNT; i++) {
+ 		regmap_write(map, SUN8I_SCALER_VSU_CHCOEFF0(base, i),
+ 			     ch_left[offset + i]);
+ 		regmap_write(map, SUN8I_SCALER_VSU_CHCOEFF1(base, i),
+ 			     ch_right[offset + i]);
+ 	}
+-
+-	offset = sun8i_vi_scaler_coef_index(hstep) *
++	offset = sun8i_vi_scaler_coef_index(vstep / format->vsub) *
+ 			SUN8I_VI_SCALER_COEFF_COUNT;
+-	for (i = 0; i < SUN8I_VI_SCALER_COEFF_COUNT; i++) {
+-		regmap_write(map, SUN8I_SCALER_VSU_YVCOEFF(base, i),
+-			     lan2coefftab32[offset + i]);
++	for (i = 0; i < SUN8I_VI_SCALER_COEFF_COUNT; i++)
+ 		regmap_write(map, SUN8I_SCALER_VSU_CVCOEFF(base, i),
+ 			     cy[offset + i]);
+-	}
+ }
+ 
+ void sun8i_vi_scaler_enable(struct sun8i_layer *layer, bool enable)

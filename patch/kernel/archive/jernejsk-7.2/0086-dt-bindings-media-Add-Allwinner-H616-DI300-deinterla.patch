@@ -1,0 +1,96 @@
+From 103796feae0990cb01b744fced7e610c1c2a25d3 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Mon, 20 Jul 2026 23:32:37 +0200
+Subject: [PATCH] dt-bindings: media: Add Allwinner H616 DI300 deinterlace
+
+The Allwinner H616 and later SoCs carry the DI300 deinterlace core, a
+newer generation than the sun8i-h3-deinterlace block. It takes up to
+three temporally adjacent input frames per pass and sits behind the
+SoC's IOMMU. Add a binding for it.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DYGKzAWRTYx9uBDzpTDK2p
+---
+ .../allwinner,sun50i-h616-deinterlace.yaml    | 72 +++++++++++++++++++
+ 1 file changed, 72 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/allwinner,sun50i-h616-deinterlace.yaml
+
+diff --git a/Documentation/devicetree/bindings/media/allwinner,sun50i-h616-deinterlace.yaml b/Documentation/devicetree/bindings/media/allwinner,sun50i-h616-deinterlace.yaml
+new file mode 100644
+index 00000000000000..cdf29894479e8e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/allwinner,sun50i-h616-deinterlace.yaml
+@@ -0,0 +1,72 @@
++# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/media/allwinner,sun50i-h616-deinterlace.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Allwinner H616 DI300 Deinterlace
++
++maintainers:
++  - Jernej Skrabec <jernej.skrabec@siol.net>
++
++description: |-
++  The Allwinner H616 and later has a DI300 deinterlace core used for
++  deinterlacing interlaced video content. Unlike the older H3 block, it
++  takes up to three temporally adjacent input frames per pass and is
++  wired up behind the SoC's system IOMMU.
++
++properties:
++  compatible:
++    const: allwinner,sun50i-h616-deinterlace
++
++  reg:
++    maxItems: 1
++
++  interrupts:
++    maxItems: 1
++
++  clocks:
++    items:
++      - description: Deinterlace bus clock
++      - description: Deinterlace module clock
++
++  clock-names:
++    items:
++      - const: bus
++      - const: mod
++
++  resets:
++    maxItems: 1
++
++  iommus:
++    maxItems: 1
++
++required:
++  - compatible
++  - reg
++  - interrupts
++  - clocks
++  - clock-names
++  - resets
++  - iommus
++
++additionalProperties: false
++
++examples:
++  - |
++    #include <dt-bindings/interrupt-controller/arm-gic.h>
++    #include <dt-bindings/clock/sun50i-h616-ccu.h>
++    #include <dt-bindings/reset/sun50i-h616-ccu.h>
++
++    deinterlace: deinterlace@1420000 {
++        compatible = "allwinner,sun50i-h616-deinterlace";
++        reg = <0x01420000 0x40000>;
++        clocks = <&ccu CLK_BUS_DEINTERLACE>,
++                 <&ccu CLK_DEINTERLACE>;
++        clock-names = "bus", "mod";
++        resets = <&ccu RST_BUS_DEINTERLACE>;
++        interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
++        iommus = <&iommu 1>;
++    };
++
++...

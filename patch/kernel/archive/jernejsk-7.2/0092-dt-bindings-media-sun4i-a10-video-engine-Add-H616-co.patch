@@ -1,0 +1,45 @@
+From 965f5164ade89a55fbb42b6a7f25d2886c67cc7c Mon Sep 17 00:00:00 2001
+From: Chen-Yu Tsai <wens@kernel.org>
+Date: Sat, 11 Jul 2026 21:59:54 +0800
+Subject: [PATCH] dt-bindings: media: sun4i-a10-video-engine: Add H616
+ compatible
+
+The H616 contains a video engine similar to past SoCs.
+
+Add a new compatible for it.
+
+Acked-by: Rob Herring (Arm) <robh@kernel.org>
+Reviewed-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+Signed-off-by: Chen-Yu Tsai <wens@kernel.org>
+---
+ .../bindings/media/allwinner,sun4i-a10-video-engine.yaml       | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-video-engine.yaml b/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-video-engine.yaml
+index 818d815d473202..20c430795134da 100644
+--- a/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-video-engine.yaml
++++ b/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-video-engine.yaml
+@@ -24,6 +24,7 @@ properties:
+       - allwinner,sun50i-a64-video-engine
+       - allwinner,sun50i-h5-video-engine
+       - allwinner,sun50i-h6-video-engine
++      - allwinner,sun50i-h616-video-engine
+ 
+   reg:
+     maxItems: 1
+@@ -96,6 +97,7 @@ allOf:
+           contains:
+             enum:
+               - allwinner,sun50i-h6-video-engine
++              - allwinner,sun50i-h616-video-engine
+     then:
+       properties:
+         iommus:
+@@ -111,6 +113,7 @@ allOf:
+           contains:
+             enum:
+               - allwinner,sun50i-h6-video-engine
++              - allwinner,sun50i-h616-video-engine
+     then:
+       properties:
+         allwinner,sram:

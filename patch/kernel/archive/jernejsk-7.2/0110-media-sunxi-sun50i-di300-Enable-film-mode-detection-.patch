@@ -1,0 +1,374 @@
+From d8bde2cda85892d83885c36bafb0b3076c4460de Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Tue, 21 Jul 2026 14:28:03 +0200
+Subject: [PATCH] media: sunxi: sun50i-di300: Enable film mode detection
+ statistics
+
+The DI300 block is only sometimes built with the film mode detection
+(FMD) sub-block, depending on the SoC it's integrated into. Check for
+it via DEINTERLACE_FUNC_VSN, the per-instance hardware capability
+register (fmd_exist field), rather than assuming it's always present,
+and gate everything below on that.
+
+FMD hardware only computes raw per-field difference counters (how many
+pixels changed between temporally adjacent field pairs) and per-field
+text/video row histograms; it does not decide anything on its own. The
+actual cadence pattern matching (3:2, 2:2, ... pulldown detection,
+phase lock, scene-change handling) is done entirely in software in the
+vendor BSP, and is a substantial state machine in its own right that
+is not implemented here.
+
+What's implemented is the minimal slice that's still generically
+useful: enable the FMD block with the vendor's fixed threshold
+defaults (verbatim from di_dev_apply_fixed_para()), and expose its raw
+per-job counters read-only through a V4L2 control so userspace can
+build cadence/telecine detection on top of them without needing
+kernel changes, rather than growing a from-scratch cadence
+state machine in the driver for a policy decision better made in
+userspace.
+---
+ .../sunxi/sun50i-di300/sun50i-di300.c         | 142 +++++++++++++++++-
+ .../sunxi/sun50i-di300/sun50i-di300.h         |  77 ++++++++++
+ 2 files changed, 218 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+index 2227a4313faa06..ce26c0b03e291f 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.c
+@@ -12,7 +12,10 @@
+  * both deinterlaced fields of the middle frame in a single hardware
+  * run, unlike the older sun8i-di block which needs one run per output
+  * field. Only the plain motion-adaptive DIT path is implemented here;
+- * film-mode detection and temporal noise reduction are not used.
++ * temporal noise reduction is not used. Film mode detection (FMD), on
++ * SoCs that have it, is enabled with its raw per-field statistics
++ * exposed read-only via a control; see the comment above the FMD
++ * register block in sun50i-di300.h for what is and isn't implemented.
+  */
+ 
+ #include <linux/clk.h>
+@@ -299,9 +302,31 @@ static void deinterlace_device_run(void *priv)
+ 	deinterlace_write(dev, DEINTERLACE_DIT_CROP_V, reg);
+ 	deinterlace_write(dev, DEINTERLACE_MD_CROP_V, reg);
+ 
++	if (dev->has_fmd) {
++		reg = (ctx->src_fmt.width - 1) << 16;
++		deinterlace_write(dev, DEINTERLACE_FMD_CROP_H, reg);
++		reg = (ctx->src_fmt.height - 1) << 16;
++		deinterlace_write(dev, DEINTERLACE_FMD_CROP_V, reg);
++
++		/*
++		 * Row thresholds scale with frame area relative to the
++		 * vendor's 720x480 reference, verbatim from
++		 * di_dev_apply_fixed_para(). Fixed to the 8x8 block size
++		 * selected by leaving FMD_GLB at its DEINTERLACE_FMD_GLB
++		 * default of 0.
++		 */
++		reg = 3 * ctx->src_fmt.width * ctx->src_fmt.height / (720 * 480);
++		reg |= (2 * ctx->src_fmt.width * ctx->src_fmt.height /
++			(720 * 480)) << 8;
++		reg |= DEINTERLACE_FMD_ROW_TH_EXIT_VIDEO(60);
++		deinterlace_write(dev, DEINTERLACE_FMD_ROW_TH, reg);
++	}
++
+ 	reg = DEINTERLACE_FUNC_EN_DIT;
+ 	if (motion)
+ 		reg |= DEINTERLACE_FUNC_EN_MD;
++	if (dev->has_fmd)
++		reg |= DEINTERLACE_FUNC_EN_FMD;
+ 	deinterlace_write(dev, DEINTERLACE_FUNC_EN, reg);
+ 
+ 	reg = DEINTERLACE_DIT_SETTING_DIAG_INTP_EN;
+@@ -364,6 +389,27 @@ static irqreturn_t deinterlace_irq(int irq, void *data)
+ 
+ 	state = ctx->aborting ? VB2_BUF_STATE_ERROR : VB2_BUF_STATE_DONE;
+ 
++	if (dev->has_fmd) {
++		ctx->fmd_stats[0] = deinterlace_read(dev, DEINTERLACE_FMD_FID12) &
++				     DEINTERLACE_FMD_HIST_CNT_MASK;
++		ctx->fmd_stats[1] = deinterlace_read(dev, DEINTERLACE_FMD_FID23) &
++				     DEINTERLACE_FMD_HIST_CNT_MASK;
++		ctx->fmd_stats[2] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID30) &
++				     DEINTERLACE_FMD_HIST_CNT_MASK;
++		ctx->fmd_stats[3] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID32) &
++				     DEINTERLACE_FMD_HIST_CNT_MASK;
++		ctx->fmd_stats[4] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID10) &
++				     DEINTERLACE_FMD_HIST_CNT_MASK;
++		ctx->fmd_stats[5] = deinterlace_read(dev, DEINTERLACE_FMD_FOD_FID12) &
++				     DEINTERLACE_FMD_HIST_CNT_MASK;
++		ctx->fmd_stats[6] = deinterlace_read(dev, DEINTERLACE_FMD_FRD02) &
++				     DEINTERLACE_FMD_HIST_CNT_MASK;
++		ctx->fmd_stats[7] = deinterlace_read(dev, DEINTERLACE_FMD_FRD13) &
++				     DEINTERLACE_FMD_HIST_CNT_MASK;
++		ctx->fmd_stats[8] = deinterlace_read(dev, DEINTERLACE_FMD_FIELD_HIST0);
++		ctx->fmd_stats[9] = deinterlace_read(dev, DEINTERLACE_FMD_FIELD_HIST1);
++	}
++
+ 	dst0 = ctx->dst0;
+ 	dst1 = ctx->dst1;
+ 	v4l2_m2m_dst_buf_remove_by_buf(ctx->fh.m2m_ctx, dst0);
+@@ -384,6 +430,10 @@ static irqreturn_t deinterlace_irq(int irq, void *data)
+ 
+ static void deinterlace_init(struct deinterlace_dev *dev)
+ {
++	u32 vsn = deinterlace_read(dev, DEINTERLACE_FUNC_VSN);
++
++	dev->has_fmd = DEINTERLACE_FUNC_VSN_FMD_EXIST(vsn) != 0;
++
+ 	deinterlace_write(dev, DEINTERLACE_MD_PARA, DEINTERLACE_MD_PARA_DEFAULT);
+ 
+ 	deinterlace_write(dev, DEINTERLACE_DIT_CHR_PARA0,
+@@ -396,6 +446,28 @@ static void deinterlace_init(struct deinterlace_dev *dev)
+ 			  DEINTERLACE_DIT_INTER_PARA_DEFAULT);
+ 	deinterlace_write(dev, DEINTERLACE_DIT_DEMO_H, 0);
+ 	deinterlace_write(dev, DEINTERLACE_DIT_DEMO_V, 0);
++
++	if (dev->has_fmd) {
++		deinterlace_write(dev, DEINTERLACE_FMD_DIFF_TH0,
++				  DEINTERLACE_FMD_DIFF_TH0_DEFAULT);
++		deinterlace_write(dev, DEINTERLACE_FMD_DIFF_TH1,
++				  DEINTERLACE_FMD_DIFF_TH1_DEFAULT);
++		deinterlace_write(dev, DEINTERLACE_FMD_DIFF_TH2,
++				  DEINTERLACE_FMD_DIFF_TH2_DEFAULT);
++		deinterlace_write(dev, DEINTERLACE_FMD_FEAT_TH0,
++				  DEINTERLACE_FMD_FEAT_TH0_DEFAULT);
++		deinterlace_write(dev, DEINTERLACE_FMD_FEAT_TH1,
++				  DEINTERLACE_FMD_FEAT_TH1_DEFAULT);
++		deinterlace_write(dev, DEINTERLACE_FMD_FEAT_TH2,
++				  DEINTERLACE_FMD_FEAT_TH2_DEFAULT);
++		deinterlace_write(dev, DEINTERLACE_FMD_MOT_TH,
++				  DEINTERLACE_FMD_MOT_TH_DEFAULT);
++		deinterlace_write(dev, DEINTERLACE_FMD_TEXT_TH,
++				  DEINTERLACE_FMD_TEXT_TH_DEFAULT);
++		deinterlace_write(dev, DEINTERLACE_FMD_BLK_TH,
++				  DEINTERLACE_FMD_BLK_TH_DEFAULT);
++		deinterlace_write(dev, DEINTERLACE_FMD_GLB, 0);
++	}
+ }
+ 
+ static inline struct deinterlace_ctx *deinterlace_file2ctx(struct file *file)
+@@ -817,6 +889,42 @@ static int deinterlace_queue_init(void *priv, struct vb2_queue *src_vq,
+ 	return 0;
+ }
+ 
++/* driver-private, order: FID12, FID23, FOD_FID30/32/10/12, FRD02/13, FIELD_HIST0/1 */
++#define V4L2_CID_SUNXI_DI300_FMD_STATS	(V4L2_CID_USER_BASE + 0x1100)
++
++static int deinterlace_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
++{
++	struct deinterlace_ctx *ctx =
++		container_of(ctrl->handler, struct deinterlace_ctx, hdl);
++
++	switch (ctrl->id) {
++	case V4L2_CID_SUNXI_DI300_FMD_STATS:
++		memcpy(ctrl->p_new.p_u32, ctx->fmd_stats, sizeof(ctx->fmd_stats));
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static const struct v4l2_ctrl_ops deinterlace_ctrl_ops = {
++	.g_volatile_ctrl = deinterlace_g_volatile_ctrl,
++};
++
++static const struct v4l2_ctrl_config deinterlace_fmd_stats_ctrl = {
++	.ops	= &deinterlace_ctrl_ops,
++	.id	= V4L2_CID_SUNXI_DI300_FMD_STATS,
++	.name	= "FMD Raw Statistics",
++	.type	= V4L2_CTRL_TYPE_U32,
++	.flags	= V4L2_CTRL_FLAG_READ_ONLY | V4L2_CTRL_FLAG_VOLATILE,
++	.min	= 0,
++	.max	= DEINTERLACE_FMD_HIST_CNT_MASK,
++	.step	= 1,
++	.def	= 0,
++	.dims	= { DEINTERLACE_FMD_STATS_COUNT },
++};
++
+ static int deinterlace_open(struct file *file)
+ {
+ 	struct deinterlace_dev *dev = video_drvdata(file);
+@@ -847,10 +955,24 @@ static int deinterlace_open(struct file *file)
+ 	v4l2_fh_init(&ctx->fh, video_devdata(file));
+ 	ctx->dev = dev;
+ 
++	if (dev->has_fmd) {
++		v4l2_ctrl_handler_init(&ctx->hdl, 1);
++		v4l2_ctrl_new_custom(&ctx->hdl, &deinterlace_fmd_stats_ctrl, NULL);
++		if (ctx->hdl.error) {
++			ret = ctx->hdl.error;
++			v4l2_ctrl_handler_free(&ctx->hdl);
++			v4l2_fh_exit(&ctx->fh);
++			goto err_free;
++		}
++		ctx->fh.ctrl_handler = &ctx->hdl;
++	}
++
+ 	ctx->fh.m2m_ctx = v4l2_m2m_ctx_init(dev->m2m_dev, ctx,
+ 					    &deinterlace_queue_init);
+ 	if (IS_ERR(ctx->fh.m2m_ctx)) {
+ 		ret = PTR_ERR(ctx->fh.m2m_ctx);
++		v4l2_ctrl_handler_free(&ctx->hdl);
++		v4l2_fh_exit(&ctx->fh);
+ 		goto err_free;
+ 	}
+ 
+@@ -876,6 +998,7 @@ static int deinterlace_release(struct file *file)
+ 
+ 	v4l2_fh_del(&ctx->fh, file);
+ 	v4l2_fh_exit(&ctx->fh);
++	v4l2_ctrl_handler_free(&ctx->hdl);
+ 	v4l2_m2m_ctx_release(ctx->fh.m2m_ctx);
+ 
+ 	kfree(ctx);
+@@ -1000,8 +1123,25 @@ static int deinterlace_probe(struct platform_device *pdev)
+ 
+ 	pm_runtime_enable(dev->dev);
+ 
++	/*
++	 * Probe dev->has_fmd once up front, so it is stable by the time
++	 * the first open() decides whether to expose the FMD stats
++	 * control: has_fmd is otherwise only set on runtime resume, which
++	 * doesn't happen until the first client streams.
++	 */
++	ret = pm_runtime_resume_and_get(dev->dev);
++	if (ret < 0) {
++		dev_err(dev->dev, "Failed to enable module\n");
++
++		goto err_m2m;
++	}
++	pm_runtime_put(dev->dev);
++
+ 	return 0;
+ 
++err_m2m:
++	pm_runtime_disable(dev->dev);
++	v4l2_m2m_release(dev->m2m_dev);
+ err_video:
+ 	video_unregister_device(&dev->vfd);
+ err_v4l2:
+diff --git a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
+index a6c77c0bad107d..c15318243dd9fc 100644
+--- a/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
++++ b/drivers/media/platform/sunxi/sun50i-di300/sun50i-di300.h
+@@ -8,6 +8,7 @@
+ #ifndef _SUN50I_DI300_H_
+ #define _SUN50I_DI300_H_
+ 
++#include <media/v4l2-ctrls.h>
+ #include <media/v4l2-device.h>
+ #include <media/v4l2-mem2mem.h>
+ #include <media/videobuf2-v4l2.h>
+@@ -20,6 +21,10 @@
+ #define DEINTERLACE_RESET			0x000
+ #define DEINTERLACE_RESET_EN				BIT(31)
+ 
++/* per-instance hardware capability bits, read-only */
++#define DEINTERLACE_FUNC_VSN			0x00c
++#define DEINTERLACE_FUNC_VSN_FMD_EXIST(v)		(((v) >> 26) & 3)
++
+ #define DEINTERLACE_START			0x010
+ #define DEINTERLACE_START_EN				BIT(0)
+ 
+@@ -33,6 +38,7 @@
+ #define DEINTERLACE_FUNC_EN			0x020
+ #define DEINTERLACE_FUNC_EN_DIT			BIT(0)
+ #define DEINTERLACE_FUNC_EN_MD				BIT(1)
++#define DEINTERLACE_FUNC_EN_FMD			BIT(3)
+ 
+ #define DEINTERLACE_DMA_CTL			0x024
+ #define DEINTERLACE_DMA_CTL_C				BIT(0)
+@@ -133,6 +139,70 @@
+ #define DEINTERLACE_DIT_DEMO_H			0x1c8
+ #define DEINTERLACE_DIT_DEMO_V			0x1cc
+ 
++/*
++ * Film mode detection: only present on some instances of the DI300
++ * IP, gated on DEINTERLACE_FUNC_VSN_FMD_EXIST(). Hardware computes raw
++ * per-field difference counters and text/video row histograms only;
++ * cadence pattern matching (2:2, 3:2, ...) and lock/unlock decisions
++ * are entirely software, done in vendor's di300_alg.c, and are not
++ * implemented here. What's wired up is limited to enabling the block
++ * with vendor's fixed thresholds and exposing its raw counters
++ * read-only, for userspace to build cadence detection on top of if it
++ * wants to.
++ */
++#define DEINTERLACE_FMD_DIFF_TH0		0x1d0
++#define DEINTERLACE_FMD_DIFF_TH0_DEFAULT		0xff03ff00
++
++#define DEINTERLACE_FMD_DIFF_TH1		0x1d4
++#define DEINTERLACE_FMD_DIFF_TH1_DEFAULT		0x0003ff00
++
++#define DEINTERLACE_FMD_DIFF_TH2		0x1d8
++#define DEINTERLACE_FMD_DIFF_TH2_DEFAULT		0x0220ff00
++
++/* field/frame difference counters, 30-bit pixel counts */
++#define DEINTERLACE_FMD_FID12			0x1e0
++#define DEINTERLACE_FMD_FID23			0x1e4
++#define DEINTERLACE_FMD_FOD_FID30		0x1e8
++#define DEINTERLACE_FMD_FOD_FID32		0x1ec
++#define DEINTERLACE_FMD_FOD_FID10		0x1f0
++#define DEINTERLACE_FMD_FOD_FID12		0x1f4
++#define DEINTERLACE_FMD_FRD02			0x1f8
++#define DEINTERLACE_FMD_FRD13			0x1fc
++#define DEINTERLACE_FMD_HIST_CNT_MASK			GENMASK(29, 0)
++
++#define DEINTERLACE_FMD_FEAT_TH0		0x200
++#define DEINTERLACE_FMD_FEAT_TH0_DEFAULT		0x05200405
++
++#define DEINTERLACE_FMD_FEAT_TH1		0x204
++#define DEINTERLACE_FMD_FEAT_TH1_DEFAULT		0x030100c0
++
++#define DEINTERLACE_FMD_FEAT_TH2		0x208
++#define DEINTERLACE_FMD_FEAT_TH2_DEFAULT		0x00020609
++
++#define DEINTERLACE_FMD_MOT_TH			0x20c
++#define DEINTERLACE_FMD_MOT_TH_DEFAULT			0x02090010
++
++#define DEINTERLACE_FMD_TEXT_TH			0x210
++#define DEINTERLACE_FMD_TEXT_TH_DEFAULT		0x000000c0
++
++/* block size fixed to 8x8 (bit 0 of FMD_GLB clear) */
++#define DEINTERLACE_FMD_BLK_TH			0x214
++#define DEINTERLACE_FMD_BLK_TH_DEFAULT			0x00151508
++
++#define DEINTERLACE_FMD_ROW_TH			0x218
++#define DEINTERLACE_FMD_ROW_TH_EXIT_VIDEO(v)		(((v) & 0xff) << 16)
++
++/* per-field text/video row histogram, read-only */
++#define DEINTERLACE_FMD_FIELD_HIST0		0x21c
++#define DEINTERLACE_FMD_FIELD_HIST1		0x220
++
++#define DEINTERLACE_FMD_GLB			0x224
++
++#define DEINTERLACE_FMD_CROP_H			0x230
++#define DEINTERLACE_FMD_CROP_V			0x234
++
++#define DEINTERLACE_FMD_STATS_COUNT	10
++
+ #define DEINTERLACE_MIN_WIDTH	2U
+ #define DEINTERLACE_MIN_HEIGHT	2U
+ #define DEINTERLACE_MAX_WIDTH	2048U
+@@ -163,6 +233,10 @@ struct deinterlace_ctx {
+ 	unsigned int		first_field;
+ 
+ 	int			aborting;
++
++	/* raw FMD counters latched at the last completed job, if any */
++	struct v4l2_ctrl_handler hdl;
++	u32			fmd_stats[DEINTERLACE_FMD_STATS_COUNT];
+ };
+ 
+ struct deinterlace_dev {
+@@ -180,6 +254,9 @@ struct deinterlace_dev {
+ 	struct clk		*mod_clk;
+ 
+ 	struct reset_control	*rstc;
++
++	/* set once at probe from DEINTERLACE_FUNC_VSN, never changes */
++	bool			has_fmd;
+ };
+ 
+ #endif

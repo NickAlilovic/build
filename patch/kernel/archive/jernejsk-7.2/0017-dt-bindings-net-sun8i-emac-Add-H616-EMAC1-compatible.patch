@@ -1,0 +1,28 @@
+From 95caa3ca7f9386b5470b96f285d836f04f071272 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sun, 19 Jul 2026 15:11:29 +0200
+Subject: [PATCH] dt-bindings: net: sun8i-emac: Add H616 EMAC1 compatible
+
+H616 has a second EMAC whose clock configuration register lives at a
+different offset in the system control block, so it cannot claim
+compatibility with the A64 EMAC.
+
+Add a dedicated compatible for it.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ .../devicetree/bindings/net/allwinner,sun8i-a83t-emac.yaml       | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-a83t-emac.yaml b/Documentation/devicetree/bindings/net/allwinner,sun8i-a83t-emac.yaml
+index 323a669fa98236..a45d3c12d2099c 100644
+--- a/Documentation/devicetree/bindings/net/allwinner,sun8i-a83t-emac.yaml
++++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-a83t-emac.yaml
+@@ -33,6 +33,7 @@ properties:
+       - const: allwinner,sun8i-r40-gmac
+       - const: allwinner,sun8i-v3s-emac
+       - const: allwinner,sun50i-a64-emac
++      - const: allwinner,sun50i-h616-emac1
+       - items:
+           - enum:
+               - allwinner,sun20i-d1-emac
